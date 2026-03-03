@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕对齐工具 - 可调宽可三栏可高亮斑马纹版</title>
+    <style>
+        :root {
+            /* 黑暗模式配色 */
+            --bg-color: #121212;
+            --border-color: #333333;
+            --text-color: #e0e0e0;
+            --text-muted: #888888;
+            --accent-color: #555555;
+            --highlight-blue: rgba(64, 156, 255, 0.8);
+            
+            /* 斑马纹配色 */
+            --row-odd: #2a2a2a;
+            --row-even: #1e1e1e;
+            
+            /* 行高设定 */
+            --line-height: 28px;
+            --padding-top: 14px;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            font-weight: 500;
+            letter-spacing: 1px;
+            color: #ffffff;
+        }
+
+        .toggle-btn {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn:hover {
+            background-color: #3a3a3a;
+            border-color: #555;
+        }
+
+        .toggle-btn:active {
+            background-color: #222;
+        }
+
+        .editor-container {
+            position: relative; 
+            display: flex;
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            background-color: var(--row-even);
+        }
+
+        /* 悬浮的幽灵高亮行 */
+        .highlight-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: var(--line-height);
+            background-color: rgba(64, 156, 255, 0.15); 
+            border-top: 1px solid rgba(64, 156, 255, 0.4);
+            border-bottom: 1px solid rgba(64, 156, 255, 0.4);
+            pointer-events: none; /* 鼠标点击穿透 */
+            box-sizing: border-box;
+            z-index: 10;
+            display: none; 
+        }
+
+        /* 核心对齐与斑马纹属性 */
+        .sync-pane {
+            font-family: 'Consolas', 'Monaco', 'Courier New', 'Microsoft YaHei', monospace;
+            font-size: 14px;
+            line-height: var(--line-height);
+            padding: var(--padding-top) 15px;
+            margin: 0;
+            box-sizing: border-box;
+            
+            background-image: repeating-linear-gradient(
+                to bottom,
+                var(--row-odd) 0px,
+                var(--row-odd) var(--line-height),
+                var(--row-even) var(--line-height),
+                var(--row-even) calc(var(--line-height) * 2)
+            );
+            background-attachment: local;
+            background-position: 0 var(--padding-top);
+        }
+
+        .line-numbers {
+            width: 60px;
+            min-width: 60px;
+            padding-left: 5px;
+            padding-right: 15px;
+            color: var(--text-muted);
+            text-align: right;
+            border-right: 1px solid var(--border-color);
+            user-select: none;
+            overflow-y: hidden;
+            white-space: pre;
+            filter: brightness(0.9); 
+        }
+
+        .text-editor {
+            flex: 1; /* 初始平分宽度 */
+            min-width: 50px; /* 防止被缩得太小 */
+            color: #ffffff;
+            border: none;
+            resize: none;
+            outline: none;
+            white-space: pre; 
+            overflow: auto;
+        }
+
+        /* 拖拽分割线 */
+        .resizer {
+            position: relative;
+            width: 1px;
+            background-color: var(--border-color);
+            cursor: col-resize;
+            flex-shrink: 0;
+            z-index: 12;
+            transition: background-color 0.2s;
+        }
+        
+        /* 增加鼠标的可点击热区范围 */
+        .resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: -4px;
+            right: -4px;
+            cursor: col-resize;
+            z-index: 13;
+        }
+
+        .resizer:hover, .resizer.dragging {
+            background-color: var(--highlight-blue);
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 14px;
+            height: 14px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-left: 1px solid var(--border-color);
+            border-top: 1px solid var(--border-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 7px;
+            border: 3px solid var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+        
+        /* 修复底部横竖滚动条交界处的白色突兀方块 */
+        ::-webkit-scrollbar-corner {
+            background-color: var(--bg-color); 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>字幕双语对齐工具</h1>
+        <button id="toggle-btn" class="toggle-btn">切换至三列模式</button>
+    </div>
+
+    <div class="editor-container">
+        <!-- 高亮层 -->
+        <div id="highlight-bar" class="highlight-bar"></div>
+
+        <!-- 左侧行号 -->
+        <div id="line-numbers" class="sync-pane line-numbers">1</div>
+        
+        <!-- 文本框 1 (左) -->
+        <textarea id="left-text" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴英文原文..."></textarea>
+        
+        <!-- 分割线 1 -->
+        <div class="resizer" id="resizer-1"></div>
+
+        <!-- 文本框 2 (中 - 默认隐藏) -->
+        <textarea id="middle-text" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴机翻 / 辅助参考..." style="display: none;"></textarea>
+        
+        <!-- 分割线 2 (默认隐藏) -->
+        <div class="resizer" id="resizer-2" style="display: none;"></div>
+
+        <!-- 文本框 3 (右) -->
+        <textarea id="right-text" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴人工修改 / 最终译文..."></textarea>
+    </div>
+
+    <script>
+        const leftText = document.getElementById('left-text');
+        const middleText = document.getElementById('middle-text');
+        const rightText = document.getElementById('right-text');
+        const lineNumbers = document.getElementById('line-numbers');
+        const highlightBar = document.getElementById('highlight-bar');
+        const toggleBtn = document.getElementById('toggle-btn');
+        const resizer1 = document.getElementById('resizer-1');
+        const resizer2 = document.getElementById('resizer-2');
+
+        const LINE_HEIGHT = 28;
+        const PADDING_TOP = 14;
+
+        // ==== 1. 切换两列/三列模式逻辑 ====
+        let isThreeCol = false;
+        
+        toggleBtn.addEventListener('click', () => {
+            isThreeCol = !isThreeCol;
+            
+            // 切换时，将各列重置为均等宽度
+            leftText.style.flex = '1';
+            middleText.style.flex = '1';
+            rightText.style.flex = '1';
+
+            if (isThreeCol) {
+                middleText.style.display = 'block';
+                resizer2.style.display = 'block';
+                toggleBtn.textContent = '切换至两列模式';
+            } else {
+                middleText.style.display = 'none';
+                resizer2.style.display = 'none';
+                toggleBtn.textContent = '切换至三列模式';
+            }
+            updateLineNumbers(); 
+            renderHighlight();   
+        });
+
+        // ==== 2. 宽度拖拽调整逻辑 ====
+        function setupResizer(resizerId) {
+            const resizer = document.getElementById(resizerId);
+            let prevSibling, nextSibling;
+            let x = 0;
+            let prevWidth = 0;
+            let nextWidth = 0;
+
+            const mouseDownHandler = function(e) {
+                x = e.clientX;
+                
+                // 向上寻找上一个可见的文本框
+                prevSibling = resizer.previousElementSibling;
+                while (prevSibling && (window.getComputedStyle(prevSibling).display === 'none' || prevSibling.classList.contains('resizer') || prevSibling.id === 'highlight-bar')) {
+                    prevSibling = prevSibling.previousElementSibling;
+                }
+                
+                // 向下寻找下一个可见的文本框
+                nextSibling = resizer.nextElementSibling;
+                while (nextSibling && (window.getComputedStyle(nextSibling).display === 'none' || nextSibling.classList.contains('resizer'))) {
+                    nextSibling = nextSibling.nextElementSibling;
+                }
+
+                if (!prevSibling || !nextSibling) return;
+
+                // 【核心修复区域：避免浏览器重排跳变】
+                // 第一步：先将所有可见的框和宽度的读取操作集中在一起
+                prevWidth = prevSibling.getBoundingClientRect().width;
+                nextWidth = nextSibling.getBoundingClientRect().width;
+                
+                const visibleEditors = Array.from(document.querySelectorAll('.text-editor'))
+                                            .filter(el => window.getComputedStyle(el).display !== 'none');
+                const currentWidths = visibleEditors.map(el => el.getBoundingClientRect().width);
+
+                // 第二步：集中执行写入操作（此时所有真实宽度已经读取完毕，写入不再引发相互影响的重排计算）
+                visibleEditors.forEach((el, index) => {
+                    el.style.flex = `${currentWidths[index]} 1 0%`;
+                });
+
+                // 绑定拖拽事件
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+                resizer.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                
+                // 拖拽时临时禁用文本框交互，防止意外选中文本产生卡顿
+                document.querySelectorAll('.text-editor').forEach(el => el.style.pointerEvents = 'none');
+            };
+
+            const mouseMoveHandler = function(e) {
+                const dx = e.clientX - x;
+                
+                if (prevWidth + dx < 50 || nextWidth - dx < 50) return;
+
+                // 实时分配新的宽度比例
+                prevSibling.style.flex = `${prevWidth + dx} 1 0%`;
+                nextSibling.style.flex = `${nextWidth - dx} 1 0%`;
+            };
+
+            const mouseUpHandler = function() {
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+                
+                document.querySelectorAll('.text-editor').forEach(el => el.style.pointerEvents = '');
+            };
+
+            resizer.addEventListener('mousedown', mouseDownHandler);
+        }
+
+        setupResizer('resizer-1');
+        setupResizer('resizer-2');
+
+
+        // ==== 3. 高亮行追踪逻辑 ====
+        let currentLineIndex = -1;
+
+        function updateActiveLine(textarea) {
+            const textUntilCursor = textarea.value.substring(0, textarea.selectionStart);
+            currentLineIndex = textUntilCursor.split('\n').length - 1;
+            renderHighlight();
+        }
+
+        function renderHighlight() {
+            if (currentLineIndex === -1) {
+                highlightBar.style.display = 'none';
+                return;
+            }
+            highlightBar.style.display = 'block';
+            
+            const scrollPos = lineNumbers.scrollTop;
+            const yPos = PADDING_TOP + (currentLineIndex * LINE_HEIGHT) - scrollPos;
+            highlightBar.style.transform = `translateY(${yPos}px)`;
+        }
+
+        ['mouseup', 'keyup', 'focus', 'input'].forEach(evt => {
+            leftText.addEventListener(evt, () => updateActiveLine(leftText));
+            middleText.addEventListener(evt, () => updateActiveLine(middleText));
+            rightText.addEventListener(evt, () => updateActiveLine(rightText));
+        });
+
+        // ==== 4. 智能多列同步滚动 ====
+        function bindSyncScroll(element) {
+            element.addEventListener('scroll', function() {
+                if (element.ignoreScroll) {
+                    element.ignoreScroll = false;
+                    return;
+                }
+                const top = element.scrollTop;
+                const others =[leftText, middleText, rightText, lineNumbers].filter(el => el !== element);
+                others.forEach(other => {
+                    if (other.style.display !== 'none') {
+                        other.ignoreScroll = true; 
+                        other.scrollTop = top;
+                    }
+                });
+                renderHighlight(); 
+            });
+        }
+
+        bindSyncScroll(leftText);
+        bindSyncScroll(middleText);
+        bindSyncScroll(rightText);
+        bindSyncScroll(lineNumbers);
+
+        // ==== 5. 动态生成行号逻辑 ====
+        let lastLineCount = 1;
+
+        function updateLineNumbers() {
+            const leftLines = leftText.value.split('\n').length;
+            const rightLines = rightText.value.split('\n').length;
+            let maxLines = Math.max(leftLines, rightLines, 1);
+            
+            if (isThreeCol) {
+                const middleLines = middleText.value.split('\n').length;
+                maxLines = Math.max(maxLines, middleLines);
+            }
+
+            if (maxLines !== lastLineCount) {
+                let numbersStr = '';
+                for (let i = 1; i <= maxLines; i++) {
+                    numbersStr += i + '\n';
+                }
+                lineNumbers.textContent = numbersStr;
+                lastLineCount = maxLines;
+            }
+        }
+
+        leftText.addEventListener('input', updateLineNumbers);
+        middleText.addEventListener('input', updateLineNumbers);
+        rightText.addEventListener('input', updateLineNumbers);
+
+        updateLineNumbers();
+    </script>
+</body>
+</html>

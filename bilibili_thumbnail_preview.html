@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B站封面预览模拟器</title>
+<style>
+    :root {
+        --bg-color: #0b0b0b;
+        --panel-bg: #18181a;
+        --border-color: #333;
+        --text-main: #f1f2f3;
+        --text-sub: #9499a0;
+        --color-169: #00a1d6; /* B站蓝 */
+        --color-43: #fb7299;  /* B站粉 */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        overflow-x: hidden;
+        padding: 40px 20px;
+    }
+
+    .container {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: 800px;
+        gap: 30px;
+    }
+
+    /* 上方控制面板 */
+    .control-panel {
+        background: var(--panel-bg);
+        padding: 20px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .input-group {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .input-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 250px;
+    }
+
+    .input-item label {
+        white-space: nowrap;
+        color: var(--text-sub);
+    }
+
+    .input-item input[type="text"] {
+        flex: 1;
+        background: #202020;
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 8px 12px;
+        border-radius: 4px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .input-item input[type="text"]:focus {
+        border-color: var(--color-169);
+    }
+
+    /* 图层切换控制 */
+    .layer-controls {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        margin-top: 5px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .layer-btn {
+        background: #202020;
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .layer-btn:hover { background: #333; }
+
+    .layer-btn.active-169 { border-color: var(--color-169); background: rgba(0, 161, 214, 0.2); color: var(--color-169); }
+    .layer-btn.active-43 { border-color: var(--color-43); background: rgba(251, 114, 153, 0.2); color: var(--color-43); }
+
+    /* 编辑区 */
+    .upload-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        padding: 60px 40px;
+        text-align: center;
+        color: var(--text-sub);
+        cursor: pointer;
+        transition: all 0.3s;
+        background: var(--panel-bg);
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--color-169);
+        color: var(--color-169);
+    }
+    .upload-zone input { display: none; }
+
+    .workspace {
+        display: none;
+        background: var(--panel-bg);
+        padding: 10px;
+        border-radius: 8px;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    /* 拖拽新图片到工作区时的样式 */
+    .workspace.dragover {
+        box-shadow: 0 0 0 2px var(--color-169) inset;
+        background: rgba(0, 161, 214, 0.05);
+    }
+
+    #img-container {
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+        line-height: 0; 
+    }
+    
+    #img-container img {
+        display: block;
+        max-width: 100%;
+        max-height: 60vh;
+        user-select: none;
+        -webkit-user-drag: none;
+        pointer-events: none;
+    }
+
+    .crop-box {
+        position: absolute;
+        top: 0;
+        left: 0;
+        border: 2px solid;
+        cursor: move;
+        background: rgba(255, 255, 255, 0.15);
+        transition: opacity 0.2s;
+    }
+    
+    .crop-box::before {
+        content: attr(data-label);
+        position: absolute;
+        top: -24px;
+        left: -2px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: bold;
+        color: #fff;
+    }
+
+    #box-169 { border-color: var(--color-169); }
+    #box-169::before { background: var(--color-169); right: -2px; left: auto; }
+    #box-43 { border-color: var(--color-43); }
+    #box-43::before { background: var(--color-43); }
+
+    .crop-box:not(.active) {
+        opacity: 0.4;
+        z-index: 1 !important;
+    }
+    .crop-box.active {
+        opacity: 1;
+        z-index: 10 !important;
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.5);
+    }
+    .crop-box:not(.active) .resize-handle {
+        display: none;
+    }
+
+    .resize-handle {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        background: #fff;
+        right: -7px;
+        bottom: -7px;
+        cursor: se-resize;
+        border-radius: 50%;
+        border: 2px solid #000;
+        box-shadow: 0 0 4px rgba(0,0,0,0.5);
+    }
+
+    /* 预览区 */
+    .preview-section {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 40px;
+        opacity: 0.3;
+        pointer-events: none;
+        transition: opacity 0.3s;
+        align-items: flex-start;
+    }
+
+    .preview-group {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .preview-group:nth-child(2) {
+        flex: 1;
+        min-width: 450px;
+    }
+
+    .label-large {
+        font-size: 20px;
+        font-weight: bold;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .label-43 { color: var(--color-43); }
+    .label-169 { color: var(--color-169); }
+
+    /* 卡片通用样式 */
+    .b-card {
+        background: #202020;
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .b-card .cover {
+        position: relative;
+        width: 100%;
+        background: #333;
+        line-height: 0;
+    }
+    .b-card .cover canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .b-card .duration {
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        background: rgba(0,0,0,0.45);
+        padding: 4px 4px;
+        border-radius: 3px;
+        font-size: 13px;
+        line-height: 1;
+        color: #fff;
+    }
+
+    /* 三个点 "更多" 按钮通用样式 */
+    .more-btn {
+        position: absolute;
+        color: var(--text-sub);
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        user-select: none;
+        padding: 4px;
+        margin-right: -4px; /* 抵消扩大的点击热区 */
+        transition: color 0.2s;
+    }
+    .more-btn:hover {
+        color: var(--color-169);
+    }
+    
+    /* 首页竖排卡片 (4:3) */
+    .card-home { width: 260px; }
+    .card-home .cover { aspect-ratio: 4 / 3; position: relative; }
+    
+    /* 需求①：封面底部的渐变遮罩及数据 */
+    .card-home .cover-stats {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        padding: 18px 15px 12px;
+        background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+        pointer-events: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+    .card-home .cover-stats-left { display: flex; gap: 18px; }
+    .card-home .cover .duration { position: static; background: transparent; padding: 0; }
+
+    .card-home .info { padding: 10px 10px 12px 10px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+    .card-home .title {
+        font-size: 15px;
+        line-height: 22px;
+        height: 44px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+    .card-home .up-info { font-size: 13px; color: var(--text-sub); display: flex; align-items: center; gap: 6px; padding-right: 20px; }
+    /* 需求②：竖卡的更多按钮 */
+    .card-home .more-btn { right: 10px; bottom: 12px; }
+
+    /* 横排卡片 (16:9) */
+    .card-horizontal {
+        display: flex;
+        background: transparent;
+        box-shadow: none;
+        width: 100%;
+        gap: 12px;
+    }
+    .card-horizontal .cover {
+        width: 240px;
+        aspect-ratio: 16 / 9;
+        flex-shrink: 0;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .card-horizontal .info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 4px 0;
+        position: relative;
+        padding-right: 20px;
+    }
+    .card-horizontal .title {
+        font-size: 15px;
+        line-height: 22px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .card-horizontal .up-info { font-size: 13px; color: var(--text-sub); line-height: 22px; }
+    /* 需求②：横卡的更多按钮 */
+    .card-horizontal .more-btn { right: 0; bottom: 4px; }
+
+    #cover-169-2 { width: 173px; }
+
+    .tip { font-size: 13px; color: #888; margin-top: 10px; display: none; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 顶部控制面板 -->
+    <div class="control-panel">
+        <div class="input-group">
+            <div class="input-item">
+                <label>视频标题</label>
+                <input type="text" id="input-title" value="" placeholder="输入视频标题">
+            </div>
+            <div class="input-item">
+                <label>UP主昵称</label>
+                <input type="text" id="input-up" value="" placeholder="输入UP主名字">
+            </div>
+        </div>
+        
+        <div class="layer-controls">
+            <span style="color: var(--text-sub); font-size: 14px;">当前操作图层：</span>
+            <button class="layer-btn active-43" id="btn-43">操作 4:3 (首页框)</button>
+            <button class="layer-btn" id="btn-169">操作 16:9 (个人主页框)</button>
+            <!-- 需求③：更换图片按钮 -->
+            <button class="layer-btn" id="btn-reupload" style="display: none; border-color: #666; margin-left: auto;">📸 更换图片</button>
+        </div>
+    </div>
+
+    <!-- 上部：图片上传与裁剪区 -->
+    <div class="editor-section">
+        <div class="upload-zone" id="drop-zone">
+            <h2>点击或拖拽图片到此处上传</h2>
+            <p style="margin-top: 10px">支持任意尺寸，上传后可自由调整封面裁切区域</p>
+            <input type="file" id="file-input" accept="image/*">
+        </div>
+        
+        <div class="workspace" id="workspace">
+            <div id="img-container">
+                <img id="source-img" src="" alt="源图片">
+                <div class="crop-box" id="box-169" data-label="16:9 个人主页">
+                    <div class="resize-handle"></div>
+                </div>
+                <div class="crop-box active" id="box-43" data-label="4:3 首页">
+                    <div class="resize-handle"></div>
+                </div>
+            </div>
+        </div>
+        <p class="tip" id="editor-tip">💡 提示：可直接拖拽新图片到此区域替换；拖拽框体中心可移动，拖拽右下角圆点可等比例缩放。</p>
+    </div>
+
+    <!-- 下部：实时预览区 -->
+    <div class="preview-section" id="preview-section">
+        
+        <!-- 场景 1：首页 4:3 (左侧) -->
+        <div class="preview-group">
+            <div class="label-large label-43">首页竖向卡片 (4:3)</div>
+            <div class="b-card card-home">
+                <div class="cover">
+                    <canvas id="canvas-43"></canvas>
+                    <!-- 需求①：遮罩和数据移动到封面内部底部 -->
+                    <div class="cover-stats">
+                        <div class="cover-stats-left">
+                            <span>▷  11.4万</span>
+                            <span>≡  514</span>
+                        </div>
+                        <span class="duration">19:19</span>
+                    </div>
+                </div>
+                <div class="info">
+                    <div class="title dynamic-title">我们至今无法完全解释这个反直觉的物理实验</div>
+                    <div class="up-info">
+                        <span style="color:#fb7299">✔ 已关注</span> <span class="dynamic-up">Veritasium真理元素</span>
+                    </div>
+                    <!-- 需求②：更多按钮 -->
+                    <div class="more-btn">⋮</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2 & 3：个人主页/热门页 16:9 (右侧) -->
+        <div class="preview-group">
+            <div class="label-large label-169">个人主页 / 热门页横向卡片 (16:9)</div>
+            
+            <div class="b-card card-horizontal">
+                <div class="cover">
+                    <canvas id="canvas-169-1"></canvas>
+                    <span class="duration">52:09</span>
+                </div>
+                <div class="info">
+                    <div class="title dynamic-title">我们至今无法完全解释这个反直觉的物理实验</div>
+                    <div class="up-info">
+                        <span>UP <span class="dynamic-up">Veritasium真理元素</span></span><br>
+                        <span>▷ 23.2万观看 · 22小时前</span>
+                    </div>
+                    <!-- 需求②：更多按钮 -->
+                    <div class="more-btn">⋮</div>
+                </div>
+            </div>
+
+            <div class="b-card card-horizontal" style="margin-top: 10px;">
+                <div class="cover" id="cover-169-2">
+                    <canvas id="canvas-169-2"></canvas>
+                    <span class="duration">39:17</span>
+                </div>
+                <div class="info">
+                    <div class="title dynamic-title">我们至今无法完全解释这个反直觉的物理实验</div>
+                    <div class="up-info">
+                        <span>2025年9月8日</span><br>
+                        <span>▷ 180.4万 ≡ 3535</span>
+                    </div>
+                    <!-- 需求②：更多按钮 -->
+                    <div class="more-btn">⋮</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const workspace = document.getElementById('workspace');
+    const imgContainer = document.getElementById('img-container');
+    const sourceImg = document.getElementById('source-img');
+    const previewSection = document.getElementById('preview-section');
+    const editorTip = document.getElementById('editor-tip');
+    const btnReupload = document.getElementById('btn-reupload');
+    
+    const inputTitle = document.getElementById('input-title');
+    const inputUp = document.getElementById('input-up');
+    const dynamicTitles = document.querySelectorAll('.dynamic-title');
+    const dynamicUps = document.querySelectorAll('.dynamic-up');
+
+    const canvas43 = document.getElementById('canvas-43');
+    const canvas169_1 = document.getElementById('canvas-169-1');
+    const canvas169_2 = document.getElementById('canvas-169-2');
+    const btn169 = document.getElementById('btn-169');
+    const btn43 = document.getElementById('btn-43');
+
+    let imgLoaded = false;
+    let activeKey = '169';
+    let lastContainerW = 0; 
+    let lastContainerH = 0; 
+
+    const boxState = {
+        '169': { el: document.getElementById('box-169'), btn: btn169, ratio: 16 / 9, x: 0, y: 0, w: 0, h: 0 },
+        '43':  { el: document.getElementById('box-43'),  btn: btn43,  ratio: 4 / 3,  x: 0, y: 0, w: 0, h: 0 }
+    };
+
+    // --- 输入框同步逻辑 ---
+    inputTitle.addEventListener('input', (e) => {
+        const val = e.target.value || '我们至今无法完全解释这个反直觉的物理实验';
+        dynamicTitles.forEach(el => el.textContent = val);
+    });
+    inputUp.addEventListener('input', (e) => {
+        const val = e.target.value || 'Veritasium真理元素';
+        dynamicUps.forEach(el => el.textContent = val);
+    });
+
+    // --- 图层切换逻辑 ---
+    function setActiveLayer(key) {
+        activeKey = key;
+        const otherKey = key === '169' ? '43' : '169';
+        boxState[key].el.classList.add('active');
+        boxState[otherKey].el.classList.remove('active');
+        boxState[key].btn.classList.add(`active-${key}`);
+        boxState[otherKey].btn.classList.remove(`active-${otherKey}`);
+    }
+    btn169.addEventListener('click', () => setActiveLayer('169'));
+    btn43.addEventListener('click', () => setActiveLayer('43'));
+
+    // --- 需求③：上传与更换图片逻辑 ---
+    btnReupload.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    function addDragEvents(element) {
+        element.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            element.classList.add('dragover');
+        });
+        element.addEventListener('dragleave', () => element.classList.remove('dragover'));
+        element.addEventListener('drop', (e) => {
+            e.preventDefault();
+            element.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+    }
+    addDragEvents(dropZone);
+    addDragEvents(workspace); // 允许直接拖拽新图片到编辑区更换
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleFile(e.target.files[0]);
+        // 清空value保证同名文件能二次触发
+        fileInput.value = '';
+    });
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) return alert('请上传图片文件！');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            sourceImg.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 图片加载/替换后的重新渲染逻辑
+    sourceImg.addEventListener('load', () => {
+        if (!imgLoaded) {
+            initEditor();
+        } else {
+            // 当更换图片时，等待DOM更新完图片宽高后，重新计算裁切框
+            requestAnimationFrame(() => {
+                lastContainerW = imgContainer.clientWidth;
+                lastContainerH = imgContainer.clientHeight;
+                initBox('169', lastContainerW, lastContainerH);
+                initBox('43', lastContainerW, lastContainerH);
+                updatePreviews();
+            });
+        }
+    });
+
+    function initEditor() {
+        workspace.style.display = 'flex';
+        dropZone.style.display = 'none';
+        previewSection.style.opacity = '1';
+        previewSection.style.pointerEvents = 'auto';
+        editorTip.style.display = 'block';
+        btnReupload.style.display = 'block'; // 显示更换图片按钮
+        imgLoaded = true;
+
+        lastContainerW = imgContainer.clientWidth;
+        lastContainerH = imgContainer.clientHeight;
+
+        initBox('169', lastContainerW, lastContainerH);
+        initBox('43', lastContainerW, lastContainerH);
+        updatePreviews();
+    }
+
+    function initBox(key, cW, cH) {
+        let state = boxState[key];
+        
+        // 保证有一个方向顶格撑满，另一个方向居中
+        let w = cW;
+        let h = w / state.ratio;
+        if (h > cH) {
+            h = cH;
+            w = h * state.ratio;
+        }
+        
+        state.w = w;
+        state.h = h;
+        state.x = (cW - w) / 2;
+        state.y = (cH - h) / 2;
+        applyBoxDOM(state);
+    }
+
+    function applyBoxDOM(state) {
+        state.el.style.width = state.w + 'px';
+        state.el.style.height = state.h + 'px';
+        state.el.style.left = state.x + 'px';
+        state.el.style.top = state.y + 'px';
+    }
+
+    // --- 框体拖拽与缩放事件 ---
+    function bindBoxEvents(key) {
+        const state = boxState[key];
+        const el = state.el;
+        const handle = el.querySelector('.resize-handle');
+
+        let isDragging = false;
+        let isResizing = false;
+        let startX, startY, startBoxX, startBoxY, startBoxW;
+
+        handle.addEventListener('mousedown', (e) => {
+            if (activeKey !== key) return;
+            e.stopPropagation();
+            isResizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startBoxW = state.w;
+            startBoxX = state.x;
+            startBoxY = state.y;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        el.addEventListener('mousedown', (e) => {
+            if (activeKey !== key) setActiveLayer(key);
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startBoxX = state.x;
+            startBoxY = state.y;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        function onMouseMove(e) {
+            const containerW = imgContainer.clientWidth;
+            const containerH = imgContainer.clientHeight;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            if (isResizing) {
+                let newW = startBoxW + dx;
+                let newH = newW / state.ratio;
+
+                if (startBoxX + newW > containerW) {
+                    newW = containerW - startBoxX;
+                    newH = newW / state.ratio;
+                }
+                if (startBoxY + newH > containerH) {
+                    newH = containerH - startBoxY;
+                    newW = newH * state.ratio;
+                }
+                if (newW < 60) {
+                    newW = 60;
+                    newH = newW / state.ratio;
+                }
+
+                state.w = newW;
+                state.h = newH;
+            } else if (isDragging) {
+                let newX = startBoxX + dx;
+                let newY = startBoxY + dy;
+
+                if (newX < 0) newX = 0;
+                if (newY < 0) newY = 0;
+                if (newX + state.w > containerW) newX = containerW - state.w;
+                if (newY + state.h > containerH) newY = containerH - state.h;
+
+                state.x = newX;
+                state.y = newY;
+            }
+            
+            applyBoxDOM(state);
+            updatePreviews();
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            isResizing = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+    }
+    bindBoxEvents('169');
+    bindBoxEvents('43');
+
+    // --- 渲染到Canvas预览 ---
+    function updatePreviews() {
+        if (!imgLoaded) return;
+        
+        const scaleX = sourceImg.naturalWidth / imgContainer.clientWidth;
+        const scaleY = sourceImg.naturalHeight / imgContainer.clientHeight;
+
+        const s43 = boxState['43'];
+        const s169 = boxState['169'];
+
+        drawToCanvas(canvas43, s43, scaleX, scaleY);
+        drawToCanvas(canvas169_1, s169, scaleX, scaleY);
+        
+        const ctx2 = canvas169_2.getContext('2d');
+        canvas169_2.width = canvas169_1.width;
+        canvas169_2.height = canvas169_1.height;
+        ctx2.drawImage(canvas169_1, 0, 0);
+    }
+
+    function drawToCanvas(canvas, state, scaleX, scaleY) {
+        const ctx = canvas.getContext('2d');
+        canvas.width = state.w * scaleX;
+        canvas.height = state.h * scaleY;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+            sourceImg, 
+            state.x * scaleX, state.y * scaleY, state.w * scaleX, state.h * scaleY,
+            0, 0, canvas.width, canvas.height
+        );
+    }
+
+    // --- 窗口改变自适应计算 ---
+    window.addEventListener('resize', () => {
+        if(!imgLoaded) return;
+        const newW = imgContainer.clientWidth;
+        const newH = imgContainer.clientHeight;
+        if(newW === lastContainerW && newH === lastContainerH) return;['169', '43'].forEach(key => {
+            const state = boxState[key];
+            const ratioX = state.x / lastContainerW;
+            const ratioY = state.y / lastContainerH;
+            const ratioW = state.w / lastContainerW;
+
+            let newBoxW = newW * ratioW;
+            let newBoxH = newBoxW / state.ratio;
+            let newBoxX = newW * ratioX;
+            let newBoxY = newH * ratioY;
+
+            if (newBoxX + newBoxW > newW) newBoxX = newW - newBoxW;
+            if (newBoxY + newBoxH > newH) newBoxY = newH - newBoxH;
+            if (newBoxX < 0) newBoxX = 0;
+            if (newBoxY < 0) newBoxY = 0;
+
+            state.w = newBoxW;
+            state.h = newBoxH;
+            state.x = newBoxX;
+            state.y = newBoxY;
+            
+            applyBoxDOM(state);
+        });
+
+        lastContainerW = newW;
+        lastContainerH = newH;
+        updatePreviews();
+    });
+</script>
+
+</body>
+</html>

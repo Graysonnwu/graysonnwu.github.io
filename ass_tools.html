@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>ASS 综合辅助工具</title>
+    <style>
+        :root { 
+            --bg: #f8f9fa; 
+            --card: #ffffff; 
+            --text: #212529; 
+            --primary: #007bff;
+            --sidebar-bg: #e9ecef;
+            --sidebar-hover: #dee2e6;
+            --border: rgba(128,128,128,0.2);
+        }
+        @media (prefers-color-scheme: dark) { 
+            :root { 
+                --bg: #121212; 
+                --card: #1e1e1e; 
+                --text: #e0e0e0; 
+                --primary: #3793ff;
+                --sidebar-bg: #2a2a2a;
+                --sidebar-hover: #3a3a3a;
+                --border: rgba(255,255,255,0.1);
+            } 
+        }
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            height: 100vh;
+            display: flex; 
+            overflow: hidden;
+        }
+
+        /* 侧边栏与收起逻辑 */
+        .sidebar {
+            width: 220px;
+            background: var(--sidebar-bg);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            box-sizing: border-box;
+            transition: margin-left 0.3s ease;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        body.sidebar-closed .sidebar {
+            margin-left: -220px;
+        }
+        
+        /* 悬浮切换按钮 */
+        .toggle-btn {
+            position: fixed;
+            top: 15px;
+            left: 235px; /* 220 + 15 */
+            transition: left 0.3s ease;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            color: var(--text);
+        }
+        body.sidebar-closed .toggle-btn { left: 15px; }
+        .toggle-btn:hover { background: var(--sidebar-hover); }
+
+        .sidebar-title {
+            padding: 0 20px 20px 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+        .nav-btn {
+            padding: 15px 20px;
+            border: none;
+            background: none;
+            color: var(--text);
+            text-align: left;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            opacity: 0.7;
+        }
+        .nav-btn:hover { background: var(--sidebar-hover); opacity: 1; }
+        .nav-btn.active { 
+            background: rgba(0,123,255,0.1); 
+            color: var(--primary); 
+            border-right: 4px solid var(--primary);
+            font-weight: bold;
+            opacity: 1;
+        }
+
+        /* 主内容区样式 */
+        .main-content {
+            flex: 1;
+            padding: 40px 30px 30px 30px;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* 卡片共用样式 */
+        .card { 
+            background: var(--card); 
+            padding: 25px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15); 
+            width: 100%; 
+            display: none; 
+            animation: fadeIn 0.3s ease;
+        }
+        .card.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 工具 1：色彩工具特定样式 */
+        .color-card { max-width: 500px; }
+        .row { margin-bottom: 20px; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; opacity: 0.8; }
+        .input-row { display: flex; gap: 10px; align-items: center; }
+        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #444; border-radius: 8px; background: transparent; color: inherit; font-family: monospace; }
+        input[type="color"] { width: 50px; height: 44px; border: none; cursor: pointer; background: none; }
+        .hsv-controls { background: rgba(0,0,0,0.05); padding: 15px; border-radius: 12px; }
+        .slider-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .slider-item span { min-width: 30px; font-size: 0.8rem; font-family: monospace; }
+        input[type="range"] { flex: 1; cursor: pointer; }
+        .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+        .preview-box { border-radius: 10px; padding: 12px; text-align: center; border: 1px solid var(--border); }
+        .color-circle { height: 50px; border-radius: 8px; margin-bottom: 8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.1); }
+        
+        /* 工具 2：坐标工具特定样式 */
+        .pos-card { max-width: 800px; }
+        .file-upload-box {
+            border: 2px dashed var(--border);
+            padding: 20px;
+            text-align: center;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: 0.2s;
+        }
+        .file-upload-box:hover { border-color: var(--primary); background: rgba(0,123,255,0.05); }
+        .file-upload-box input { display: none; }
+        
+        .image-wrapper {
+            position: relative;
+            width: 100%;
+            max-height: 60vh;
+            overflow: hidden;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.1);
+            display: none;
+            text-align: center;
+        }
+        .image-wrapper img {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+            cursor: crosshair;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        /* Aegisub 样式十字参考线 */
+        .crosshair {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        #hline {
+            height: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+        }
+        #vline {
+            width: 0;
+            border-left: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 1px 0 0 rgba(0, 0, 0, 0.6);
+        }
+
+        /* 结果框原样还原 */
+        .result-code, #assCode { 
+            width: 100%; padding: 15px; box-sizing: border-box; 
+            background: rgba(0,123,255,0.1); border: 2px solid var(--primary); 
+            color: var(--primary); border-radius: 8px; font-weight: bold; 
+            font-size: 1.1rem; text-align: center; cursor: pointer; transition: 0.2s; 
+        }
+        .result-code:hover, #assCode:hover { background: rgba(0,123,255,0.2); }
+        
+        .tip { font-size: 0.75rem; color: #888; margin-top: 15px; line-height: 1.4; border-left: 3px solid #ffc107; padding-left: 10px; }
+        .img-info { display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 10px; opacity: 0.7; }
+    </style>
+</head>
+<body>
+
+    <!-- 侧边栏收起/展开按钮 -->
+    <button class="toggle-btn" onclick="document.body.classList.toggle('sidebar-closed')" title="收起/展开侧边栏">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+    </button>
+
+    <!-- 左侧导航 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-title">ASS Tools</div>
+        <button class="nav-btn active" onclick="switchTab('tool-pos', this)">🎯 坐标拾取</button>
+        <button class="nav-btn" onclick="switchTab('tool-color', this)">🎨 色彩净化</button>
+    </div>
+
+    <!-- 右侧主体内容 -->
+    <div class="main-content">
+        
+        <!-- ==================== 坐标拾取工具 ==================== -->
+        <div id="tool-pos" class="card pos-card active">
+            <h2 style="margin: 0 0 5px 0; font-size: 1.3rem;">ASS 坐标拾取工具</h2>
+            <p style="margin: 0 0 20px 0; font-size: 0.8rem; opacity: 0.6;">加载截图，画面内移动显示参考线，点击即复制原始分辨率坐标</p>
+
+            <label>1. 加载视频截图 (直接拖拽或点击)</label>
+            <div class="file-upload-box" onclick="document.getElementById('imageLoader').click()">
+                <span id="upload-text">点击选择图片，或将截图拖拽至此</span>
+                <input type="file" id="imageLoader" accept="image/*">
+            </div>
+
+            <div class="image-wrapper" id="imgWrapper">
+                <img id="previewImg" src="" alt="截图预览">
+                <div id="hline" class="crosshair"></div>
+                <div id="vline" class="crosshair"></div>
+            </div>
+            
+            <div class="img-info" id="imgInfo" style="display: none;">
+                <span id="resText">原始分辨率: -</span>
+                <span id="coordText">当前鼠标: -</span>
+            </div>
+
+            <div class="result-area" style="margin-top: 20px;">
+                <label>2. 点击画面，获取并复制 ASS 代码</label>
+                <input type="text" id="posCode" class="result-code" readonly placeholder="请先加载图片并点击画面" title="点击复制">
+            </div>
+        </div>
+
+        <!-- ==================== 色彩净化工具 ==================== -->
+        <div id="tool-color" class="card color-card">
+            <h2 style="margin: 0 0 5px 0; font-size: 1.3rem;">ASS 色彩净化工具</h2>
+            <p style="margin: 0 0 20px 0; font-size: 0.8rem; opacity: 0.6;">截图去灰 → HSV微调 → FFmpeg实测经验补偿</p>
+
+            <div class="row">
+                <label>1. 拾取截图颜色</label>
+                <div class="input-row">
+                    <input type="color" id="picker" value="#eb8330">
+                    <input type="text" id="hexInput" value="#eb8330" spellcheck="false">
+                </div>
+            </div>
+
+            <div class="row hsv-controls">
+                <label>2. HSV 净化 (手动去灰/提亮)</label>
+                <div class="slider-item">
+                    <span>H</span><input type="range" id="h_slider" min="0" max="360" value="0"><span id="h_val">0</span>
+                </div>
+                <div class="slider-item">
+                    <span>S</span><input type="range" id="s_slider" min="0" max="100" value="0"><span id="s_val">0</span>
+                </div>
+                <div class="slider-item">
+                    <span>V</span><input type="range" id="v_slider" min="0" max="100" value="0"><span id="v_val">0</span>
+                </div>
+                <div style="text-align: center;"><button onclick="resetHSV()" style="font-size: 0.7rem; cursor: pointer; padding: 4px 10px; border-radius: 4px;">重置微调</button></div>
+            </div>
+
+            <div class="preview-grid">
+                <div class="preview-box">
+                    <label>净化后的目标色</label>
+                    <div id="demoTarget" class="color-circle"></div>
+                    <small id="textTarget">#000000</small>
+                </div>
+                <div class="preview-box">
+                    <label>补偿后的 ASS 色</label>
+                    <div id="demoASS" class="color-circle"></div>
+                    <small id="textASS">#000000</small>
+                </div>
+            </div>
+
+            <div class="result-area">
+                <label>3. 点击复制 ASS 补偿代码</label>
+                <input type="text" id="assCode" class="result-code" readonly title="点击复制">
+            </div>
+
+            <div class="tip">
+                <strong>提示：</strong> 如果觉得截图太“脏”，调高 <b>S (饱和度)</b>；如果太暗，调高 <b>V (亮度)</b>。<br>
+                已应用基于测试数据的 FFmpeg 压制色差经验补偿公式（分段线性校正）。<br>
+                脚本需声明 <code>YCbCr Matrix: TV.709</code>。
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    // ==========================================
+    // UI 控制逻辑
+    // ==========================================
+    function switchTab(tabId, btnObj) {
+        document.querySelectorAll('.card').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btnObj.classList.add('active');
+    }
+
+    // 复用原汁原味的复制逻辑
+    function copyCode(inputElement) {
+        if (!inputElement.value || inputElement.value.includes('获取')) return;
+        inputElement.select();
+        document.execCommand('copy');
+        const oldVal = inputElement.value;
+        inputElement.value = "已复制到剪贴板！";
+        setTimeout(() => { 
+            if (inputElement.value === "已复制到剪贴板！") {
+                inputElement.value = oldVal; 
+            }
+        }, 1000);
+    }
+
+    // ==========================================
+    // 工具 1：坐标拾取逻辑 (Aegisub 十字准心版)
+    // ==========================================
+    const imageLoader = document.getElementById('imageLoader');
+    const previewImg = document.getElementById('previewImg');
+    const imgWrapper = document.getElementById('imgWrapper');
+    const posCode = document.getElementById('posCode');
+    const hline = document.getElementById('hline');
+    const vline = document.getElementById('vline');
+    const coordText = document.getElementById('coordText');
+    let isImageLoaded = false;
+
+    // 图片加载
+    imageLoader.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            previewImg.src = url;
+            previewImg.onload = function() {
+                isImageLoaded = true;
+                imgWrapper.style.display = 'block';
+                document.getElementById('imgInfo').style.display = 'flex';
+                document.getElementById('upload-text').textContent = "重新选择图片 (" + file.name + ")";
+                document.getElementById('resText').textContent = `原始分辨率: ${this.naturalWidth} x ${this.naturalHeight}`;
+                posCode.value = "点击上方图片获取坐标";
+                hline.style.display = 'none';
+                vline.style.display = 'none';
+            }
+        }
+    });
+
+    // 拖拽上传支持
+    const uploadBox = document.querySelector('.file-upload-box');
+    uploadBox.addEventListener('dragover', (e) => { e.preventDefault(); uploadBox.style.borderColor = "var(--primary)"; });
+    uploadBox.addEventListener('dragleave', (e) => { e.preventDefault(); uploadBox.style.borderColor = "var(--border)"; });
+    uploadBox.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadBox.style.borderColor = "var(--border)";
+        if(e.dataTransfer.files.length > 0) {
+            imageLoader.files = e.dataTransfer.files;
+            imageLoader.dispatchEvent(new Event('change'));
+        }
+    });
+
+    // 核心算法：计算实际图像边界与坐标
+    function getCoords(e, img) {
+        const rect = img.getBoundingClientRect();
+        const naturalRatio = img.naturalWidth / img.naturalHeight;
+        const renderRatio = rect.width / rect.height;
+        
+        let actualWidth = rect.width, actualHeight = rect.height, leftOffset = 0, topOffset = 0;
+        
+        if (naturalRatio > renderRatio) {
+            actualHeight = rect.width / naturalRatio;
+            topOffset = (rect.height - actualHeight) / 2;
+        } else {
+            actualWidth = rect.height * naturalRatio;
+            leftOffset = (rect.width - actualWidth) / 2;
+        }
+
+        const clientX = e.clientX - rect.left;
+        const clientY = e.clientY - rect.top;
+
+        // 如果光标在 object-fit 留白黑边内，返回空
+        if (clientX < leftOffset || clientX > leftOffset + actualWidth || clientY < topOffset || clientY > topOffset + actualHeight) {
+            return null;
+        }
+
+        const x = Math.round(((clientX - leftOffset) / actualWidth) * img.naturalWidth);
+        const y = Math.round(((clientY - topOffset) / actualHeight) * img.naturalHeight);
+
+        return { x, y, cx: clientX, cy: clientY, left: leftOffset, top: topOffset, aw: actualWidth, ah: actualHeight };
+    }
+
+    // 鼠标移动时实时更新十字准心
+    previewImg.addEventListener('mousemove', function(e) {
+        if (!isImageLoaded) return;
+        const coords = getCoords(e, this);
+        if (coords) {
+            hline.style.display = 'block';
+            vline.style.display = 'block';
+            
+            // 限制十字准线仅在真实画面范围内延伸
+            hline.style.left = coords.left + 'px';
+            hline.style.width = coords.aw + 'px';
+            hline.style.top = coords.cy + 'px';
+
+            vline.style.top = coords.top + 'px';
+            vline.style.height = coords.ah + 'px';
+            vline.style.left = coords.cx + 'px';
+
+            coordText.textContent = `当前鼠标: X=${coords.x}, Y=${coords.y}`;
+        } else {
+            hline.style.display = 'none';
+            vline.style.display = 'none';
+            coordText.textContent = `当前鼠标: 画面外`;
+        }
+    });
+
+    // 鼠标离开时隐藏准心
+    previewImg.addEventListener('mouseleave', function() {
+        hline.style.display = 'none';
+        vline.style.display = 'none';
+        coordText.textContent = `当前鼠标: -`;
+    });
+
+    // 点击复制
+    previewImg.addEventListener('click', function(e) {
+        if (!isImageLoaded) return;
+        const coords = getCoords(e, this);
+        if (coords) {
+            posCode.value = `\\pos(${coords.x},${coords.y})`;
+            copyCode(posCode);
+        }
+    });
+
+    posCode.addEventListener('click', function() { copyCode(this); });
+
+
+    // ==========================================
+    // 工具 2：色彩净化逻辑 (还原原有代码)
+    // ==========================================
+    const el = (id) => document.getElementById(id);
+
+    function rgb2hsv(r, g, b) {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+        let h, s = (max === 0 ? 0 : d / max), v = max;
+        if (max === min) h = 0;
+        else {
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        return[h * 360, s * 100, v * 100];
+    }
+
+    function hsv2rgb(h, s, v) {
+        h /= 360; s /= 100; v /= 100;
+        let r, g, b, i = Math.floor(h * 6), f = h * 6 - i, p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+        switch (i % 6) {
+            case 0: r = v, g = t, b = p; break;
+            case 1: r = q, g = v, b = p; break;
+            case 2: r = p, g = v, b = t; break;
+            case 3: r = p, g = q, b = v; break;
+            case 4: r = t, g = p, b = v; break;
+            case 5: r = v, g = p, b = q; break;
+        }
+        return[Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+
+    function updateColor() {
+        const[r, g, b] = hsv2rgb(parseFloat(el('h_slider').value), parseFloat(el('s_slider').value), parseFloat(el('v_slider').value));
+        const targetHex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+
+        const comp = (y) => {
+            let x;
+            if (y <= 0) x = 0;
+            else if (y < 74) x = (85 / 74) * y;
+            else if (y < 163) x = 85 + (85 / 89) * (y - 74);
+            else if (y < 253) x = 170 + (85 / 90) * (y - 163);
+            else x = 255;
+            return Math.max(0, Math.min(255, Math.round(x)));
+        };
+
+        const r_ass = comp(r), g_ass = comp(g), b_ass = comp(b);
+        const r_h = r_ass.toString(16).padStart(2, '0').toUpperCase();
+        const g_h = g_ass.toString(16).padStart(2, '0').toUpperCase();
+        const b_h = b_ass.toString(16).padStart(2, '0').toUpperCase();
+
+        el('demoTarget').style.backgroundColor = targetHex;
+        el('textTarget').textContent = targetHex;
+        el('demoASS').style.backgroundColor = `#${r_h}${g_h}${b_h}`;
+        el('textASS').textContent = `#${r_h}${g_h}${b_h}`;
+        
+        // 严格还原最初版本的输出格式
+        el('assCode').value = `\\1c&H${b_h}${g_h}${r_h}&`;
+        
+        el('h_val').textContent = Math.round(el('h_slider').value);
+        el('s_val').textContent = Math.round(el('s_slider').value);
+        el('v_val').textContent = Math.round(el('v_slider').value);
+    }
+
+    function initFromHex(hex) {
+        if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+        const r = parseInt(hex.substring(1,3), 16), g = parseInt(hex.substring(3,5), 16), b = parseInt(hex.substring(5,7), 16);
+        const[h, s, v] = rgb2hsv(r, g, b);
+        el('h_slider').value = h;
+        el('s_slider').value = s;
+        el('v_slider').value = v;
+        updateColor();
+    }
+
+    function resetHSV() { initFromHex(el('picker').value); }
+
+    el('picker').addEventListener('input', (e) => { el('hexInput').value = e.target.value; initFromHex(e.target.value); });
+    el('hexInput').addEventListener('input', (e) => { if(e.target.value.length===7){ el('picker').value = e.target.value; initFromHex(e.target.value); }});
+    ['h_slider', 's_slider', 'v_slider'].forEach(id => el(id).addEventListener('input', updateColor));
+    
+    // 初始化颜色工具
+    initFromHex('#EB8330');
+
+    el('assCode').addEventListener('click', function() { copyCode(this); });
+
+</script>
+
+</body>
+</html>
