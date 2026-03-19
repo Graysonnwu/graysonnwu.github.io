@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>焦散透镜 - 亮度平衡与重心分析工具</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --border-color: #333;
+            --primary: #4facfe;
+            --text-main: #eeeeee;
+            --text-sub: #aaaaaa;
+            
+            --color-red: #ff4757;
+            --color-blue: #1e90ff;
+            --color-yellow: #ffa502;
+            --color-green: #2ed573;
+            --color-grey: #a4b0be;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            gap: 20px;
+        }
+
+        .canvas-area {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #0a0a0a;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: auto;
+            position: relative;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #main-canvas {
+            display: none; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .empty-state {
+            position: absolute;
+            color: var(--text-sub);
+            font-size: 18px;
+            pointer-events: none;
+        }
+
+        .sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            padding-right: 5px; 
+        }
+
+        h1 { margin: 0; font-size: 20px; color: var(--primary); padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        h3 { margin: 0 0 10px 0; font-size: 15px; }
+
+        .drop-zone {
+            border: 2px dashed #444;
+            border-radius: 8px;
+            padding: 20px 10px;
+            text-align: center;
+            background-color: var(--panel-bg);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background-color: #252525; }
+        .drop-zone.disabled { opacity: 0.5; pointer-events: none; border-color: #333; }
+        .drop-zone p { margin: 5px 0 0 0; font-size: 13px; color: var(--text-sub); pointer-events: none; }
+        .drop-zone .title { font-weight: bold; font-size: 14px; color: #fff; pointer-events: none; }
+        .file-input { display: none; }
+        
+        .preview-thumb {
+            display: none;
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            position: absolute;
+            top: 50%;
+            left: 15px;
+            transform: translateY(-50%);
+            border: 1px solid #555;
+        }
+
+        .panel-box {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+            user-select: none;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+        .checkbox-row input { margin-right: 10px; cursor: pointer; width: 16px; height: 16px;}
+        .checkbox-row:hover { background: rgba(255,255,255,0.1); }
+
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; align-items: center;}
+        .val { font-family: monospace; font-size: 14px; font-weight: bold; }
+        
+        .color-red { color: var(--color-red); }
+        .color-grey { color: var(--color-grey); }
+        .color-green { color: var(--color-green); }
+        .color-white { color: #ffffff; }
+
+        .note {
+            font-size: 12px;
+            color: var(--text-sub);
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+
+        .status-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #333; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- 左侧画布 -->
+        <div class="canvas-area" id="canvas-wrapper">
+            <div class="empty-state" id="empty-state">👉 请在右侧导入【目标亮度图】开始</div>
+            <canvas id="main-canvas"></canvas>
+        </div>
+
+        <!-- 右侧面板 -->
+        <div class="sidebar">
+            <h1>🔍 焦散透镜分析器</h1>
+
+            <div class="drop-zone" id="zone-target" onclick="document.getElementById('file-target').click()">
+                <img id="thumb-target" class="preview-thumb" src="">
+                <div class="title">1. 目标亮度图 (焦散图案)</div>
+                <p>点击或拖拽图片更换</p>
+                <input type="file" id="file-target" class="file-input" accept="image/*">
+            </div>
+
+            <div class="drop-zone disabled" id="zone-shape" onclick="document.getElementById('file-shape').click()">
+                <img id="thumb-shape" class="preview-thumb" src="">
+                <div class="title">2. 透镜形状图 (可选)</div>
+                <p>导入黑底白图测算透镜重心</p>
+                <input type="file" id="file-shape" class="file-input" accept="image/*">
+            </div>
+
+            <div class="panel-box">
+                <label class="checkbox-row">
+                    <input type="checkbox" id="check-lock" checked>
+                    <span>✅ 锁定蓝点至基准重心</span>
+                </label>
+                <div class="note" id="lock-desc">
+                    当前基准：<span style="color:var(--color-grey)">图像正中心</span>。<br>锁定后，拖动黄点可绕此中心进行雷达式切分扫描。
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <h3>📊 全局重心统计</h3>
+                <div class="stat-row">
+                    <span class="color-grey">十 图像正中心:</span>
+                    <span class="val color-grey" id="geo-center">-, -</span>
+                </div>
+                <div class="stat-row">
+                    <span class="color-red">十 目标亮度重心:</span>
+                    <span class="val color-red" id="target-center">-, -</span>
+                </div>
+                <div class="stat-row" id="row-shape-center" style="display:none;">
+                    <span class="color-green">十 透镜形状重心:</span>
+                    <span class="val color-green" id="shape-center">-, -</span>
+                </div>
+                
+                <div class="stat-row" style="margin-top: 15px; border-top: 1px dashed #444; padding-top: 10px;">
+                    <span class="color-white">重心偏差距离:</span>
+                    <span class="status-badge" id="offset-mode">距图像中心</span>
+                </div>
+                <div class="stat-row">
+                    <span class="val color-white" id="offset-dist" style="font-size: 16px;">-</span>
+                </div>
+            </div>
+            
+            <div class="panel-box" style="background-color: transparent; border: none; padding: 0;">
+                <div class="note">
+                    <b>交互说明：</b><br>
+                    • <span class="color-blue">蓝点</span>与<span style="color:#ffa502">黄点</span>连线为切割线。<br>
+                    • <span class="color-red"><b>警示：</b></span>当勾选锁定时，若两侧占比超出 <b>4:6</b>，分割线会变红。<br>
+                    • 锁定基准点是评估最优传输能量分布的最佳方式。
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('main-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const emptyState = document.getElementById('empty-state');
+        
+        const zoneTarget = document.getElementById('zone-target');
+        const fileTarget = document.getElementById('file-target');
+        const thumbTarget = document.getElementById('thumb-target');
+
+        const zoneShape = document.getElementById('zone-shape');
+        const fileShape = document.getElementById('file-shape');
+        const thumbShape = document.getElementById('thumb-shape');
+
+        const checkLock = document.getElementById('check-lock');
+        const lockDesc = document.getElementById('lock-desc');
+
+        const elGeoCenter = document.getElementById('geo-center');
+        const elTargetCenter = document.getElementById('target-center');
+        const elShapeCenter = document.getElementById('shape-center');
+        const rowShapeCenter = document.getElementById('row-shape-center');
+        const elOffsetDist = document.getElementById('offset-dist');
+        const elOffsetMode = document.getElementById('offset-mode');
+
+        let targetImg = new Image();
+        let targetData = []; 
+        let targetTotalMass = 0;
+        let targetCenterX = 0; let targetCenterY = 0;
+        let imgWidth = 0; let imgHeight = 0;
+
+        let shapeImg = new Image();
+        let hasShape = false;
+        let shapeCenterX = 0; let shapeCenterY = 0;
+
+        let isLocked = checkLock.checked;
+
+        let p1 = { x: 0, y: 0 }; 
+        let p2 = { x: 0, y: 0 }; 
+        let draggingPoint = null;
+        const POINT_RADIUS = 8;
+
+        // 色彩硬编码常量，防止 canvas 不支持 css var 导致颜色丢失
+        const C_RED = '#ff4757';
+        const C_BLUE = '#1e90ff';
+        const C_YELLOW = '#ffa502';
+        const C_GREEN = '#2ed573';
+        const C_GREY = '#a4b0be';
+
+        checkLock.addEventListener('change', (e) => {
+            isLocked = e.target.checked;
+            snapP1ToPivot();
+            if(targetData.length > 0) requestAnimationFrame(render);
+        });
+
+        function snapP1ToPivot() {
+            if (!isLocked || imgWidth === 0) return;
+            p1.x = hasShape ? shapeCenterX : imgWidth / 2;
+            p1.y = hasShape ? shapeCenterY : imgHeight / 2;
+        }
+
+        function updateLockDescription() {
+            if (hasShape) {
+                lockDesc.innerHTML = `当前基准：<span style="color:var(--color-green)">透镜形状重心(绿)</span>。<br>锁定后蓝点不可拖动。`;
+                elOffsetMode.innerText = "距透镜重心";
+            } else {
+                lockDesc.innerHTML = `当前基准：<span style="color:var(--color-grey)">图像正中心(虚线)</span>。<br>导入透镜形状后将切换基准。`;
+                elOffsetMode.innerText = "距图像中心";
+            }
+        }
+
+        function setupDropZone(zone, fileInput, loadCallback) {
+            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault(); zone.classList.remove('dragover');
+                if (zone.classList.contains('disabled')) return;
+                if (e.dataTransfer.files.length > 0) loadCallback(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) loadCallback(e.target.files[0]);
+            });
+        }
+
+        setupDropZone(zoneTarget, fileTarget, (file) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                targetImg.onload = () => {
+                    thumbTarget.src = e.target.result;
+                    thumbTarget.style.display = 'block';
+                    zoneTarget.style.paddingLeft = '65px'; 
+                    processTargetImage();
+                };
+                targetImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        setupDropZone(zoneShape, fileShape, (file) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                shapeImg.onload = () => {
+                    thumbShape.src = e.target.result;
+                    thumbShape.style.display = 'block';
+                    zoneShape.style.paddingLeft = '65px';
+                    processShapeImage();
+                };
+                shapeImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function processTargetImage() {
+            emptyState.style.display = 'none';
+            canvas.style.display = 'block';
+            zoneShape.classList.remove('disabled'); 
+            
+            const MAX_DIM = 900;
+            let displayScale = 1;
+            imgWidth = targetImg.width;
+            imgHeight = targetImg.height;
+
+            if (imgWidth > MAX_DIM || imgHeight > MAX_DIM) {
+                displayScale = imgWidth > imgHeight ? MAX_DIM / imgWidth : MAX_DIM / imgHeight;
+                imgWidth = Math.floor(imgWidth * displayScale);
+                imgHeight = Math.floor(imgHeight * displayScale);
+            }
+
+            canvas.width = imgWidth;
+            canvas.height = imgHeight;
+
+            ctx.drawImage(targetImg, 0, 0, imgWidth, imgHeight);
+            const imageData = ctx.getImageData(0, 0, imgWidth, imgHeight).data;
+
+            targetData = new Float32Array(imgWidth * imgHeight);
+            targetTotalMass = 0;
+            let momentX = 0; let momentY = 0;
+
+            for (let i = 0; i < imgWidth * imgHeight; i++) {
+                let idx = i * 4;
+                let lum = 0.299 * imageData[idx] + 0.587 * imageData[idx+1] + 0.114 * imageData[idx+2];
+                targetData[i] = lum;
+                targetTotalMass += lum;
+                momentX += (i % imgWidth) * lum;
+                momentY += Math.floor(i / imgWidth) * lum;
+            }
+
+            if (targetTotalMass === 0) { alert("目标图像完全是黑色的！"); return; }
+
+            targetCenterX = momentX / targetTotalMass;
+            targetCenterY = momentY / targetTotalMass;
+
+            if (hasShape) {
+                processShapeImage(); 
+            } else {
+                p1 = { x: imgWidth / 2, y: imgHeight / 2 };
+                p2 = { x: imgWidth / 2, y: imgHeight * 0.1 };
+            }
+
+            updateLockDescription();
+            snapP1ToPivot();
+            updateStatsPanel();
+            render();
+        }
+
+        function processShapeImage() {
+            if (imgWidth === 0) return; 
+
+            let tempCanvas = document.createElement('canvas');
+            tempCanvas.width = imgWidth;
+            tempCanvas.height = imgHeight;
+            let tCtx = tempCanvas.getContext('2d');
+            tCtx.drawImage(shapeImg, 0, 0, imgWidth, imgHeight);
+            let sData = tCtx.getImageData(0, 0, imgWidth, imgHeight).data;
+
+            let sMass = 0; let sMomentX = 0; let sMomentY = 0;
+
+            for (let i = 0; i < imgWidth * imgHeight; i++) {
+                let idx = i * 4;
+                let lum = 0.299 * sData[idx] + 0.587 * sData[idx+1] + 0.114 * sData[idx+2];
+                if (lum > 0) {
+                    sMass += lum;
+                    sMomentX += (i % imgWidth) * lum;
+                    sMomentY += Math.floor(i / imgWidth) * lum;
+                }
+            }
+
+            if (sMass === 0) { alert("透镜形状图没有有效白色区域！"); return; }
+
+            shapeCenterX = sMomentX / sMass;
+            shapeCenterY = sMomentY / sMass;
+            hasShape = true;
+            rowShapeCenter.style.display = 'flex';
+
+            updateLockDescription();
+            snapP1ToPivot(); 
+            
+            if (Math.abs(p1.x - p2.x) < 5 && Math.abs(p1.y - p2.y) < 5) {
+                p2.y = p1.y - imgHeight * 0.3;
+            }
+
+            updateStatsPanel();
+            render();
+        }
+
+        function updateStatsPanel() {
+            let geoX = imgWidth / 2;
+            let geoY = imgHeight / 2;
+            elGeoCenter.innerText = `${Math.round(geoX)}, ${Math.round(geoY)}`;
+            elTargetCenter.innerText = `${Math.round(targetCenterX)}, ${Math.round(targetCenterY)}`;
+            
+            let refX = hasShape ? shapeCenterX : geoX;
+            let refY = hasShape ? shapeCenterY : geoY;
+            
+            if (hasShape) elShapeCenter.innerText = `${Math.round(shapeCenterX)}, ${Math.round(shapeCenterY)}`;
+
+            let dist = Math.sqrt(Math.pow(targetCenterX - refX, 2) + Math.pow(targetCenterY - refY, 2));
+            let diagonal = Math.sqrt(imgWidth * imgWidth + imgHeight * imgHeight);
+            let distPercent = (dist / diagonal) * 100;
+            
+            elOffsetDist.innerText = `${dist.toFixed(1)} px (${distPercent.toFixed(2)}%)`;
+        }
+
+        function render() {
+            if (targetData.length === 0) return;
+
+            let imgData = ctx.createImageData(imgWidth, imgHeight);
+            for (let i = 0; i < targetData.length; i++) {
+                let val = targetData[i];
+                let idx = i * 4;
+                imgData.data[idx] = val; imgData.data[idx+1] = val; imgData.data[idx+2] = val; imgData.data[idx+3] = 255;
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            let massA = 0; 
+            let massB = 0; 
+            let dx = p2.x - p1.x;
+            let dy = p2.y - p1.y;
+
+            if(dx === 0 && dy === 0) dx = 0.001; 
+
+            for (let i = 0; i < imgWidth * imgHeight; i++) {
+                let lum = targetData[i];
+                if (lum === 0) continue;
+                let x = i % imgWidth;
+                let y = Math.floor(i / imgWidth);
+                
+                let cross = (x - p1.x) * dy - (y - p1.y) * dx;
+                if (cross < 0) massA += lum;
+                else massB += lum;
+            }
+
+            let ratioA_num = (massA / targetTotalMass) * 100;
+            let ratioB_num = (massB / targetTotalMass) * 100;
+            let ratioA = ratioA_num.toFixed(1) + '%';
+            let ratioB = ratioB_num.toFixed(1) + '%';
+
+            // 判断四六分严重偏差 (仅在锁定模式下)
+            let isUnbalanced = isLocked && (ratioA_num < 40 || ratioA_num > 60);
+
+            const MAX_SIZE = Math.max(imgWidth, imgHeight) * 2;
+            let angle = Math.atan2(dy, dx);
+            
+            ctx.save();
+            ctx.translate(p1.x, p1.y);
+            ctx.rotate(angle);
+            ctx.fillStyle = 'rgba(30, 144, 255, 0.25)'; 
+            ctx.fillRect(-MAX_SIZE, -MAX_SIZE, MAX_SIZE * 2, MAX_SIZE);
+            ctx.fillStyle = 'rgba(255, 165, 2, 0.25)'; 
+            ctx.fillRect(-MAX_SIZE, 0, MAX_SIZE * 2, MAX_SIZE);
+            ctx.restore();
+
+            // 绘制分割线（超差变红加粗）
+            let len = Math.sqrt(dx*dx + dy*dy);
+            let nx = dx / len;
+            let ny = dy / len;
+            ctx.beginPath();
+            ctx.strokeStyle = isUnbalanced ? C_RED : 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = isUnbalanced ? 3 : 2;
+            ctx.moveTo(p1.x - nx*MAX_SIZE, p1.y - ny*MAX_SIZE);
+            ctx.lineTo(p2.x + nx*MAX_SIZE, p2.y + ny*MAX_SIZE);
+            ctx.stroke();
+
+            // 绘制文字
+            ctx.font = "bold 42px 'Segoe UI', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(0,0,0,0.8)";
+            
+            let normalX = -dy / len;
+            let normalY = dx / len;
+            let midX = isLocked ? p1.x : p1.x + dx * 0.5;
+            let midY = isLocked ? p1.y : p1.y + dy * 0.5;
+            let textOffset = Math.min(imgWidth, imgHeight) * 0.2;
+
+            let txtAX = midX + normalX * textOffset;
+            let txtAY = midY + normalY * textOffset;
+            ctx.strokeText(ratioA, txtAX, txtAY);
+            ctx.fillStyle = "#70a1ff"; ctx.fillText(ratioA, txtAX, txtAY);
+
+            let txtBX = midX - normalX * textOffset;
+            let txtBY = midY - normalY * textOffset;
+            ctx.strokeText(ratioB, txtBX, txtBY);
+            ctx.fillStyle = "#eccc68"; ctx.fillText(ratioB, txtBX, txtBY);
+
+            // 绘制中心点与准星
+            const drawCross = (x, y, color) => {
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+                ctx.moveTo(x - 12, y); ctx.lineTo(x + 12, y);
+                ctx.moveTo(x, y - 12); ctx.lineTo(x, y + 12);
+                ctx.stroke();
+            };
+
+            ctx.beginPath(); ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+            ctx.moveTo(imgWidth/2, 0); ctx.lineTo(imgWidth/2, imgHeight);
+            ctx.moveTo(0, imgHeight/2); ctx.lineTo(imgWidth, imgHeight/2);
+            ctx.stroke(); ctx.setLineDash([]);
+
+            let pivotX = imgWidth / 2;
+            let pivotY = imgHeight / 2;
+            if (hasShape) {
+                pivotX = shapeCenterX; pivotY = shapeCenterY;
+                drawCross(shapeCenterX, shapeCenterY, C_GREEN);
+            }
+
+            ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+            ctx.moveTo(pivotX, pivotY); ctx.lineTo(targetCenterX, targetCenterY);
+            ctx.stroke(); ctx.setLineDash([]);
+
+            drawCross(targetCenterX, targetCenterY, C_RED);
+            ctx.beginPath(); ctx.arc(targetCenterX, targetCenterY, 4, 0, Math.PI*2); ctx.fillStyle = C_RED; ctx.fill();
+
+            // P2 (Yellow)
+            ctx.beginPath(); ctx.arc(p2.x, p2.y, POINT_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = C_YELLOW; ctx.fill(); 
+            ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+
+            // P1 (Blue)
+            ctx.beginPath(); ctx.arc(p1.x, p1.y, POINT_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = C_BLUE; ctx.fill(); 
+            if (isLocked) {
+                ctx.lineWidth = 3; 
+                ctx.strokeStyle = hasShape ? C_GREEN : C_GREY; 
+            } else {
+                ctx.lineWidth = 2; ctx.strokeStyle = '#fff';
+            }
+            ctx.stroke();
+        }
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            let d1 = Math.sqrt(Math.pow(pos.x - p1.x, 2) + Math.pow(pos.y - p1.y, 2));
+            let d2 = Math.sqrt(Math.pow(pos.x - p2.x, 2) + Math.pow(pos.y - p2.y, 2));
+            let threshold = POINT_RADIUS + 15; 
+            
+            if (d2 < threshold) {
+                draggingPoint = p2;
+            } else if (d1 < threshold && !isLocked) {
+                draggingPoint = p1; 
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingPoint) {
+                const pos = getMousePos(e);
+                draggingPoint.x = pos.x;
+                draggingPoint.y = pos.y;
+                requestAnimationFrame(render);
+            } else {
+                const pos = getMousePos(e);
+                let d1 = Math.sqrt(Math.pow(pos.x - p1.x, 2) + Math.pow(pos.y - p1.y, 2));
+                let d2 = Math.sqrt(Math.pow(pos.x - p2.x, 2) + Math.pow(pos.y - p2.y, 2));
+                let canDragP1 = (d1 < POINT_RADIUS + 15) && !isLocked;
+                let canDragP2 = (d2 < POINT_RADIUS + 15);
+                canvas.style.cursor = (canDragP1 || canDragP2) ? 'grab' : 'crosshair';
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => draggingPoint = null);
+        canvas.addEventListener('mouseleave', () => draggingPoint = null);
+
+    </script>
+</body>
+</html>
