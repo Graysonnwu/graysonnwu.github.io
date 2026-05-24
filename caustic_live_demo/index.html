@@ -605,6 +605,14 @@
     import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/loaders/STLLoader.js';
 
     const MODEL_DIR = './assets/models/';
+    const MODEL_FALLBACK_FILES = [
+      'brain.stl.gz',
+      'einstein.stl.gz',
+      'oiiai.stl.gz',
+      'pixeluxe.stl.gz',
+      'tom_jerry_cube.stl.gz',
+      'wave.stl.gz'
+    ];
     const MODEL_FORMATS = new Set(['obj', 'stl']);
     const MODEL_PRIORITY = {
       'stl.gz': 4,
@@ -943,8 +951,15 @@
           .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
       } catch (error) {
         console.warn('Unable to load model manifest, falling back to directory listing', error);
-        return [];
+        return getFallbackModelConfigs();
       }
+    }
+
+    function getFallbackModelConfigs() {
+      return MODEL_FALLBACK_FILES
+        .map((file) => makeModelConfig(file))
+        .filter(Boolean)
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
     }
 
     function makeModelConfig(file) {
