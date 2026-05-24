@@ -1,0 +1,2387 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Caustic Lens</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(18, 18, 16, 0.76);
+      --line: rgba(255, 255, 255, 0.16);
+      --text: #f4efe1;
+      --muted: #b8b0a0;
+      --gold: #f2c766;
+      --cyan: #7bdcff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: #10110e;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .hud {
+      position: fixed;
+      left: 50%;
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      width: min(1080px, calc(100vw - 28px));
+      padding: 10px 12px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(12, 13, 11, 0.7);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(18px);
+      pointer-events: auto;
+      transform: translateX(-50%);
+      transition: width 180ms ease, padding 180ms ease, background 180ms ease;
+    }
+
+    .collapse-tab {
+      position: absolute;
+      top: -19px;
+      left: 14px;
+      width: 40px;
+      height: 19px;
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      border-radius: 8px 8px 0 0;
+      background: rgba(12, 13, 11, 0.78);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      line-height: 1;
+      padding: 0;
+      backdrop-filter: blur(18px);
+      display: grid;
+      place-items: center;
+    }
+
+    .collapse-tab::before {
+      content: "▾";
+      display: block;
+      font-size: 17px;
+      line-height: 1;
+      transform-origin: 50% 50%;
+      transition: transform 160ms ease, color 160ms ease;
+    }
+
+    .collapse-tab:hover::before {
+      color: var(--text);
+    }
+
+    .hud.collapsed .collapse-tab::before {
+      transform: rotate(180deg);
+    }
+
+    .metric-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .hud-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 10px 12px;
+      min-height: 26px;
+    }
+
+    .hud-head > * {
+      min-width: 0;
+    }
+
+    .hud-body {
+      max-height: 260px;
+      margin-top: 8px;
+      overflow: hidden;
+      opacity: 1;
+      transform: translateY(0);
+      transition: max-height 220ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-top 220ms ease, opacity 160ms ease, transform 220ms ease;
+    }
+
+    .hud.collapsed {
+      width: min(760px, calc(100vw - 28px));
+      padding: 8px 12px 10px;
+    }
+
+    .hud.collapsed .hud-body {
+      max-height: 0;
+      margin-top: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+    }
+
+    .hud.collapsed .brand {
+      flex-wrap: nowrap;
+    }
+
+    .hud.collapsed .mesh-metric {
+      display: none;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      row-gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fffaf0;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .hud-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-left: auto;
+      min-width: 0;
+    }
+
+    .toggle-button {
+      min-width: 50px;
+      height: 24px;
+      padding: 0 9px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .toggle-button:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.11);
+      color: var(--text);
+    }
+
+    .toggle-button.active {
+      border-color: rgba(123, 220, 255, 0.56);
+      background: rgba(123, 220, 255, 0.14);
+      color: var(--text);
+    }
+
+    .metric {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      height: 24px;
+      white-space: nowrap;
+    }
+
+    .metric strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .model-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .model-picker select {
+      max-width: 140px;
+      min-width: 108px;
+      height: 26px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font: inherit;
+      outline: none;
+    }
+
+    .model-picker select:disabled {
+      opacity: 0.55;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-self: end;
+      height: 24px;
+      padding: 3px 8px;
+      border: 1px solid rgba(242, 199, 102, 0.24);
+      border-radius: 999px;
+      background: rgba(242, 199, 102, 0.1);
+      color: var(--gold);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 10px 22px;
+      min-width: 0;
+    }
+
+    .control-group {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .control {
+      display: grid;
+      grid-template-columns: 70px minmax(0, 1fr) 48px 28px 28px;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .control > * {
+      min-width: 0;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      min-width: 0;
+      accent-color: var(--cyan);
+    }
+
+    .value {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    .anim-button,
+    .reset-button {
+      position: relative;
+      width: 28px;
+      height: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      cursor: pointer;
+    }
+
+    .anim-button:hover,
+    .reset-button:hover {
+      border-color: rgba(255, 255, 255, 0.32);
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    .anim-button::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 6px;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid var(--text);
+    }
+
+    .anim-button.active {
+      border-color: rgba(123, 220, 255, 0.58);
+      background: rgba(123, 220, 255, 0.16);
+    }
+
+    .anim-button.active::before,
+    .anim-button.active::after {
+      content: "";
+      position: absolute;
+      top: 6px;
+      width: 3px;
+      height: 11px;
+      border: 0;
+      background: var(--cyan);
+    }
+
+    .anim-button.active::before {
+      left: 9px;
+    }
+
+    .anim-button.active::after {
+      left: 15px;
+    }
+
+    .reset-button::before {
+      content: "↺";
+      position: absolute;
+      inset: 1px 0 0;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 21px;
+      text-align: center;
+    }
+
+    .progress {
+      position: relative;
+      height: 3px;
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .progress span {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 12%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--gold), var(--cyan));
+      animation: load 1s ease-in-out infinite alternate;
+    }
+
+    .progress.ready span {
+      width: 100%;
+      animation: none;
+    }
+
+    @keyframes load {
+      from {
+        transform: translateX(-40%);
+      }
+      to {
+        transform: translateX(760%);
+      }
+    }
+
+    @media (max-width: 780px) {
+      .hud {
+        left: 10px;
+        right: 10px;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        width: auto;
+        max-height: min(78dvh, 620px);
+        padding: 8px;
+        transform: none;
+      }
+
+      .hud.collapsed {
+        width: auto;
+        padding: 8px;
+      }
+
+      .hud-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "brand status"
+          "actions actions";
+        gap: 8px;
+      }
+
+      .brand {
+        grid-area: brand;
+        gap: 6px 8px;
+      }
+
+      .status {
+        grid-area: status;
+      }
+
+      .hud-actions {
+        grid-area: actions;
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        justify-content: stretch;
+        gap: 6px;
+        margin-left: 0;
+      }
+
+      .toggle-button {
+        width: 100%;
+        min-width: 0;
+        padding: 0 6px;
+      }
+
+      .hud-body {
+        max-height: min(58dvh, 430px);
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+        max-height: min(52dvh, 390px);
+        overflow-y: auto;
+        padding-right: 2px;
+        scrollbar-width: thin;
+      }
+
+      .control {
+        grid-template-columns: 64px minmax(0, 1fr) 42px 27px 27px;
+        min-height: 32px;
+        gap: 6px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hud {
+        left: 8px;
+        right: 8px;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+      }
+
+      .brand {
+        max-width: calc(100vw - 116px);
+      }
+
+      .title {
+        font-size: 12px;
+      }
+
+      .model-picker {
+        flex-basis: 100%;
+      }
+
+      .model-picker select {
+        max-width: 124px;
+        min-width: 96px;
+      }
+
+      .metric {
+        height: 20px;
+        font-size: 10px;
+      }
+
+      .mesh-metric {
+        display: none;
+      }
+
+      .control {
+        grid-template-columns: 58px minmax(0, 1fr) 38px 26px 26px;
+        gap: 5px;
+        font-size: 10px;
+      }
+
+      .anim-button,
+      .reset-button {
+        width: 26px;
+      }
+    }
+
+    @media (max-height: 560px) and (orientation: landscape) {
+      .hud {
+        max-height: calc(100dvh - 20px);
+      }
+
+      .hud-body {
+        max-height: 46dvh;
+      }
+
+      .controls {
+        grid-template-columns: repeat(2, minmax(230px, 1fr));
+        max-height: 40dvh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="app"></main>
+  <section class="hud" aria-label="Caustic controls">
+    <button id="collapseHud" class="collapse-tab" type="button" aria-expanded="true" aria-label="Collapse controls" title="Collapse controls"></button>
+    <div class="hud-head">
+      <div class="brand">
+        <div class="title">Caustic Lens</div>
+        <label class="model-picker" for="modelSelect">
+          Model
+          <select id="modelSelect" aria-label="Choose lens model"></select>
+        </label>
+        <div class="metric mesh-metric">mesh <strong id="meshInfo">-</strong></div>
+      </div>
+      <div class="hud-actions" aria-label="Display toggles">
+        <button id="toggleRays" class="toggle-button active" type="button" aria-pressed="true">Rays</button>
+        <button id="toggleFloor" class="toggle-button active" type="button" aria-pressed="true">Floor</button>
+        <button id="toggleShadow" class="toggle-button active" type="button" aria-pressed="true">Shadow</button>
+      </div>
+      <div id="status" class="status">loading model</div>
+    </div>
+    <div class="hud-body">
+      <div class="controls">
+        <div class="control-group">
+          <label class="control">
+            Distance
+            <input id="distance" type="range" min="0" max="6" step="0.02" value="3">
+            <span id="distanceValue" class="value">3.00</span>
+            <button class="anim-button" type="button" data-animate="distance" aria-label="Animate distance" title="Animate distance"></button>
+            <button class="reset-button" type="button" data-reset="distance" aria-label="Reset distance" title="Reset distance"></button>
+          </label>
+          <label class="control">
+            IOR
+            <input id="ior" type="range" min="1" max="2" step="0.01" value="1.49">
+            <span id="iorValue" class="value">1.49</span>
+            <button class="anim-button" type="button" data-animate="ior" aria-label="Animate IOR" title="Animate IOR"></button>
+            <button class="reset-button" type="button" data-reset="ior" aria-label="Reset IOR" title="Reset IOR"></button>
+          </label>
+          <label class="control">
+            Exposure
+            <input id="exposure" type="range" min="0" max="0.4" step="0.01" value="0.2">
+            <span id="exposureValue" class="value">0.20</span>
+            <button class="anim-button" type="button" data-animate="exposure" aria-label="Animate exposure" title="Animate exposure"></button>
+            <button class="reset-button" type="button" data-reset="exposure" aria-label="Reset exposure" title="Reset exposure"></button>
+          </label>
+        </div>
+        <div class="control-group">
+          <label class="control">
+            Rotate X
+            <input id="rotX" type="range" min="-180" max="180" step="0.5" value="0">
+            <span id="rotXValue" class="value">0°</span>
+            <button class="anim-button" type="button" data-animate="rotX" aria-label="Animate X rotation" title="Animate X rotation"></button>
+            <button class="reset-button" type="button" data-reset="rotX" aria-label="Reset X rotation" title="Reset X rotation"></button>
+          </label>
+          <label class="control">
+            Rotate Y
+            <input id="rotY" type="range" min="-180" max="180" step="0.5" value="0">
+            <span id="rotYValue" class="value">0°</span>
+            <button class="anim-button" type="button" data-animate="rotY" aria-label="Animate Y rotation" title="Animate Y rotation"></button>
+            <button class="reset-button" type="button" data-reset="rotY" aria-label="Reset Y rotation" title="Reset Y rotation"></button>
+          </label>
+          <label class="control">
+            Rotate Z
+            <input id="rotZ" type="range" min="-180" max="180" step="0.5" value="0">
+            <span id="rotZValue" class="value">0°</span>
+            <button class="anim-button" type="button" data-animate="rotZ" aria-label="Animate Z rotation" title="Animate Z rotation"></button>
+            <button class="reset-button" type="button" data-reset="rotZ" aria-label="Reset Z rotation" title="Reset Z rotation"></button>
+          </label>
+        </div>
+      </div>
+      <div id="progress" class="progress"><span></span></div>
+    </div>
+  </section>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js"
+      }
+    }
+  </script>
+    <script type="module">
+    import * as THREE from 'three';
+    import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/loaders/RGBELoader.js';
+    import { STLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/loaders/STLLoader.js';
+
+    const MODEL_DIR = './assets/models/';
+    const MODEL_FORMATS = new Set(['obj', 'stl']);
+    const MODEL_PRIORITY = {
+      'stl.gz': 4,
+      stl: 3,
+      'obj.gz': 2,
+      obj: 1
+    };
+    const SURFACE_TEXTURES = {
+      ground: './assets/props/oak_veneer_01_1k/textures/oak_veneer_01_diff_1k.jpg',
+      wall: './assets/props/floral_jacquard_1k/textures/floral_jacquard_diff_1k.jpg'
+    };
+    const HDR_URL = './assets/env/pixeluxe_studio.hdr';
+    const HDR_ROTATION = new THREE.Euler(THREE.MathUtils.degToRad(90), 0, 0);
+    const LENS_POSITION = new THREE.Vector3(0, 0, 0.525);
+    const CAUSTIC_SIZE = 300;
+    const MAX_TRACE_SAMPLES = 42000;
+    const CAUSTIC_QUALITY = { soften: 0.34, blurPasses: 1, exposureBoost: 1 };
+    const MOBILE_BREAKPOINT = 780;
+    const DESKTOP_PIXEL_RATIO_CAP = 1.75;
+    const MOBILE_PIXEL_RATIO_CAP = 1.25;
+    const DESKTOP_SHADOW_SIZE = 2048;
+    const MOBILE_SHADOW_SIZE = 1024;
+    const RAY_LINE_DENSITY = 1400;
+    const RAY_LINE_MIN = 8;
+    const RAY_LINE_MAX = 30;
+    const SHADOW_SURFACE_OFFSET = 0.006;
+    const RECEIVER_BOARD_THICKNESS = 0.16;
+    const WALL_VISUAL_BOUNDS = {
+      yMin: -2.6,
+      yMax: 2.6,
+      zMin: 0.018,
+      zMax: 2.35
+    };
+    const GROUND_VISUAL_BOUNDS = {
+      xMin: -6.75,
+      xMax: 0.75,
+      yMin: -3.25,
+      yMax: 3.25
+    };
+    const GROUND_DISC = {
+      x: -3,
+      y: 0,
+      radius: 3.75
+    };
+    const DEFAULT_WALL_WINDOW = {
+      uMin: -0.9,
+      uMax: 0.9,
+      vMin: 0.02,
+      vMax: 0.15
+    };
+    const DEFAULT_GROUND_WINDOW = {
+      uMin: -9,
+      uMax: -1,
+      vMin: -4,
+      vMax: 4
+    };
+    const state = {
+      receiverDistance: 3,
+      rotationX: 0,
+      rotationY: 90,
+      rotationZ: 0,
+      ior: 1.49,
+      exposure: 0.2
+    };
+
+    const app = document.querySelector('#app');
+    const statusEl = document.querySelector('#status');
+    const progressEl = document.querySelector('#progress');
+    const meshInfoEl = document.querySelector('#meshInfo');
+    const modelSelect = document.querySelector('#modelSelect');
+    const hudEl = document.querySelector('.hud');
+    const toggleRaysButton = document.querySelector('#toggleRays');
+    const toggleFloorButton = document.querySelector('#toggleFloor');
+    const toggleShadowButton = document.querySelector('#toggleShadow');
+    const collapseHudButton = document.querySelector('#collapseHud');
+    const distanceInput = document.querySelector('#distance');
+    const rotXInput = document.querySelector('#rotX');
+    const rotYInput = document.querySelector('#rotY');
+    const rotZInput = document.querySelector('#rotZ');
+    const iorInput = document.querySelector('#ior');
+    const exposureInput = document.querySelector('#exposure');
+    const distanceValueEl = document.querySelector('#distanceValue');
+    const rotXValueEl = document.querySelector('#rotXValue');
+    const rotYValueEl = document.querySelector('#rotYValue');
+    const rotZValueEl = document.querySelector('#rotZValue');
+    const iorValueEl = document.querySelector('#iorValue');
+    const exposureValueEl = document.querySelector('#exposureValue');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(getRendererPixelRatio());
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.32;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x191914);
+    scene.fog = new THREE.Fog(0x191914, 8.5, 24);
+    const stlLoader = new STLLoader();
+    const textureLoader = new THREE.TextureLoader();
+    const fallbackSurfaceTexture = createSolidTexture(0x666666);
+    const fallbackCausticTexture = createSolidTexture(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.02, 40);
+    camera.up.set(0, 0, 1);
+    const cameraTarget = new THREE.Vector3(-1.05, 0, 0.55);
+    const orbit = { yaw: -0.82, pitch: 0.48, radius: 4.35 };
+
+    const raycasterPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const viewState = {
+      rays: true,
+      floor: true,
+      shadow: true,
+      collapsed: false
+    };
+    const pointerState = {
+      active: false,
+      x: 0,
+      y: 0
+    };
+
+    const controls = {
+      distance: {
+        input: distanceInput,
+        valueEl: distanceValueEl,
+        stateKey: 'receiverDistance',
+        defaultValue: 3,
+        format: (value) => value.toFixed(2),
+        trace: true,
+        duration: 5200,
+        onChange: updateReceiverTransform
+      },
+      rotX: {
+        input: rotXInput,
+        valueEl: rotXValueEl,
+        stateKey: 'rotationX',
+        defaultValue: 0,
+        format: formatDegree,
+        trace: true,
+        duration: 7000,
+        onChange: updateLensTransform
+      },
+      rotY: {
+        input: rotYInput,
+        valueEl: rotYValueEl,
+        stateKey: 'rotationY',
+        defaultValue: 0,
+        toState: (value) => value + 90,
+        format: formatDegree,
+        trace: true,
+        duration: 7800,
+        onChange: updateLensTransform
+      },
+      rotZ: {
+        input: rotZInput,
+        valueEl: rotZValueEl,
+        stateKey: 'rotationZ',
+        defaultValue: 0,
+        format: formatDegree,
+        trace: true,
+        duration: 8600,
+        onChange: updateLensTransform
+      },
+      ior: {
+        input: iorInput,
+        valueEl: iorValueEl,
+        stateKey: 'ior',
+        defaultValue: 1.49,
+        format: (value) => value.toFixed(2),
+        trace: true,
+        duration: 6200,
+        onChange: updateLensMaterial
+      },
+      exposure: {
+        input: exposureInput,
+        valueEl: exposureValueEl,
+        stateKey: 'exposure',
+        defaultValue: 0.2,
+        format: (value) => value.toFixed(2),
+        trace: false,
+        duration: 4300,
+        onChange: updateExposureOnly
+      }
+    };
+
+    let causticData = null;
+    let wallTexture = null;
+    let groundTexture = null;
+    let wallMaterial = null;
+    let wallBoardMaterial = null;
+    let groundMaterial = null;
+    let lensMaterial = null;
+    let lensMesh = null;
+    let sunLight = null;
+    let groundMesh = null;
+    let groundGrid = null;
+    let wallMesh = null;
+    let wallBoardMesh = null;
+    let shadowWallMesh = null;
+    let shadowGroundMesh = null;
+    let rayLines = null;
+    let lightArrows = null;
+    let skySphere = null;
+    let modelData = null;
+    let computeQueued = false;
+    let modelConfigs = [];
+    let currentModelIndex = 0;
+    let modelLoadToken = 0;
+    let causticWork = null;
+    const rotationMatrixScratch = new THREE.Matrix4();
+    const rotationXScratch = new THREE.Matrix4();
+    const rotationYScratch = new THREE.Matrix4();
+    const rotationZScratch = new THREE.Matrix4();
+    const activeAnimations = new Map();
+
+    setupLights();
+    setupStaticScene();
+    setupInput();
+    loadSurfaceTextures();
+    loadEnvironment();
+    updateCamera();
+    animate();
+
+    discoverModels().then((models) => {
+      modelConfigs = models;
+      populateModelSelect();
+      if (!modelConfigs.length) {
+        throw new Error(`No .obj or .stl models found in ${MODEL_DIR}`);
+      }
+      loadModel(modelConfigs[currentModelIndex]).catch(handleModelLoadError);
+    }).catch(handleModelLoadError);
+
+    async function loadModel(modelConfig) {
+      const token = ++modelLoadToken;
+      progressEl.classList.remove('ready');
+      statusEl.textContent = 'loading model';
+      meshInfoEl.textContent = '-';
+      modelSelect.disabled = true;
+
+      const response = await fetch(modelConfig.url);
+      if (!response.ok) {
+        throw new Error(`Unable to fetch ${modelConfig.url}: ${response.status}`);
+      }
+
+      statusEl.textContent = `parsing ${modelConfig.format}${modelConfig.compression === 'gzip' ? '.gz' : ''}`;
+      const model = await parseModelResponse(response, modelConfig);
+      if (token !== modelLoadToken) return;
+
+      disposeLensMesh();
+      modelData = model;
+
+      if (!lensMaterial) lensMaterial = makeLensMaterial();
+      lensMesh = new THREE.Mesh(model.geometry, lensMaterial);
+      lensMesh.position.copy(LENS_POSITION);
+      lensMesh.castShadow = true;
+      lensMesh.receiveShadow = false;
+      lensMesh.customDepthMaterial = makeLensShadowDepthMaterial();
+      scene.add(lensMesh);
+      updateLensTransform();
+
+      ensureCausticTextures();
+
+      statusEl.textContent = 'tracing rays';
+      causticData = computeCaustics(model, state, CAUSTIC_QUALITY, true);
+      updateCausticTextures(state.exposure);
+
+      updateRayLines(causticData.raySegments);
+      applyDisplayToggles();
+
+      meshInfoEl.textContent = `${model.meshRes} / ${causticData.validRays.toLocaleString()}`;
+      statusEl.textContent = 'realtime';
+      progressEl.classList.add('ready');
+      modelSelect.disabled = false;
+    }
+
+    function handleModelLoadError(error) {
+      console.error(error);
+      statusEl.textContent = 'load failed';
+      progressEl.classList.remove('ready');
+      modelSelect.disabled = false;
+    }
+
+    async function discoverModels() {
+      statusEl.textContent = 'scanning models';
+      modelSelect.disabled = true;
+
+      const manifestModels = await loadModelManifest();
+      if (manifestModels.length) return manifestModels;
+
+      const response = await fetch(MODEL_DIR, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Unable to list ${MODEL_DIR}: ${response.status}`);
+      }
+
+      const html = await response.text();
+      const documentFragment = new DOMParser().parseFromString(html, 'text/html');
+      const modelsById = new Map();
+
+      for (const anchor of documentFragment.querySelectorAll('a[href]')) {
+        const href = anchor.getAttribute('href');
+        const url = new URL(href, new URL(MODEL_DIR, window.location.href));
+        const file = decodeURIComponent(url.pathname.split('/').pop() || '');
+        const modelConfig = makeModelConfig(file);
+        if (!modelConfig) continue;
+        const existing = modelsById.get(modelConfig.id);
+        if (!existing || modelConfig.priority > existing.priority) {
+          modelsById.set(modelConfig.id, modelConfig);
+        }
+      }
+
+      const models = Array.from(modelsById.values());
+      models.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
+      return models;
+    }
+
+    async function loadModelManifest() {
+      try {
+        const response = await fetch(`${MODEL_DIR}manifest.json`, { cache: 'no-store' });
+        if (!response.ok) return [];
+        const files = await response.json();
+        if (!Array.isArray(files)) return [];
+
+        return files
+          .map((entry) => typeof entry === 'string' ? entry : entry?.file)
+          .filter(Boolean)
+          .map((file) => makeModelConfig(file))
+          .filter(Boolean)
+          .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
+      } catch (error) {
+        console.warn('Unable to load model manifest, falling back to directory listing', error);
+        return [];
+      }
+    }
+
+    function makeModelConfig(file) {
+      const modelInfo = getModelInfo(file);
+      if (!modelInfo) return null;
+      return {
+        id: modelInfo.id,
+        label: modelInfo.label,
+        file,
+        format: modelInfo.format,
+        compression: modelInfo.compression,
+        priority: modelInfo.priority,
+        url: `${MODEL_DIR}${encodeURIComponent(file)}`
+      };
+    }
+
+    function getModelInfo(file) {
+      const gzip = /\.gz$/i.test(file);
+      if (gzip && !('DecompressionStream' in window)) return null;
+
+      const geometryFile = gzip ? file.slice(0, -3) : file;
+      const formatMatch = geometryFile.match(/\.([^.]+)$/);
+      if (!formatMatch) return null;
+
+      const format = formatMatch[1].toLowerCase();
+      if (!MODEL_FORMATS.has(format)) return null;
+
+      const label = geometryFile.replace(/\.[^.]+$/, '');
+      const priorityKey = `${format}${gzip ? '.gz' : ''}`;
+      return {
+        id: label.toLowerCase(),
+        label,
+        format,
+        compression: gzip ? 'gzip' : 'none',
+        priority: MODEL_PRIORITY[priorityKey] ?? 0
+      };
+    }
+
+    function ensureCausticTextures() {
+      if (!wallTexture) wallTexture = createCausticTexture();
+      if (!groundTexture) groundTexture = createCausticTexture();
+      wallMaterial.uniforms.causticMap.value = wallTexture;
+      groundMaterial.uniforms.causticMap.value = groundTexture;
+    }
+
+    function disposeLensMesh() {
+      if (!lensMesh) return;
+      scene.remove(lensMesh);
+      lensMesh.geometry.dispose();
+      lensMesh.customDepthMaterial?.dispose();
+      lensMesh = null;
+    }
+
+    function setupLights() {
+      scene.add(new THREE.HemisphereLight(0xf8f8f2, 0x303030, 2.6));
+
+      const sun = new THREE.DirectionalLight(0xffffff, 4.5);
+      sun.position.set(4.8, 0, LENS_POSITION.z);
+      sun.target.position.set(-2.2, 0, LENS_POSITION.z);
+      sun.castShadow = true;
+      const shadowSize = getShadowMapSize();
+      sun.shadow.mapSize.set(shadowSize, shadowSize);
+      sun.shadow.radius = 3;
+      sun.shadow.bias = -0.00008;
+      sun.shadow.normalBias = 0.018;
+      sun.shadow.camera.near = 0.1;
+      sun.shadow.camera.far = 12;
+      sun.shadow.camera.left = -4.8;
+      sun.shadow.camera.right = 4.8;
+      sun.shadow.camera.top = 4.8;
+      sun.shadow.camera.bottom = -4.8;
+      sunLight = sun;
+      scene.add(sun, sun.target);
+    }
+
+    function loadEnvironment() {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+
+      new RGBELoader().load(HDR_URL, (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.repeat.x = -1;
+        texture.offset.x = 1;
+        texture.needsUpdate = true;
+        scene.environment = pmrem.fromEquirectangular(texture).texture;
+
+        skySphere = new THREE.Mesh(
+          new THREE.SphereGeometry(26, 64, 32),
+          new THREE.MeshBasicMaterial({
+            map: texture,
+            side: THREE.BackSide,
+            toneMapped: false,
+            fog: false
+          })
+        );
+        skySphere.rotation.copy(HDR_ROTATION);
+        if (scene.environmentRotation) {
+          scene.environmentRotation.copy(HDR_ROTATION);
+        }
+        scene.add(skySphere);
+      }, undefined, () => {
+        scene.background = new THREE.Color(0x24241d);
+      });
+    }
+
+    function loadSurfaceTextures() {
+      loadSurfaceTexture(SURFACE_TEXTURES.ground, (texture) => {
+        applySurfaceTexture(groundMaterial, texture);
+      });
+      loadSurfaceTexture(SURFACE_TEXTURES.wall, (texture) => {
+        applySurfaceTexture(wallMaterial, texture);
+        applySurfaceTexture(wallBoardMaterial, texture);
+      });
+    }
+
+    function loadSurfaceTexture(url, onLoad) {
+      const texture = textureLoader.load(url, () => {
+        texture.needsUpdate = true;
+      }, undefined, (error) => {
+        console.warn(`Unable to load surface texture ${url}`, error);
+      });
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.flipY = false;
+      texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+      onLoad(texture);
+    }
+
+    function applySurfaceTexture(material, texture) {
+      if (!material?.uniforms?.surfaceMap) return;
+      material.uniforms.surfaceMap.value = texture;
+      material.needsUpdate = true;
+    }
+
+    function setupStaticScene() {
+      groundMaterial = makeCausticSurfaceMaterial({
+        axis: 'ground',
+        baseColor: new THREE.Color(0x4f3320),
+        surfaceTint: new THREE.Color(0xfff3de),
+        textureScale: new THREE.Vector2(0.36, 0.36),
+        textureStrength: 0.92,
+        textureGamma: 1,
+        wrinkleStrength: 0,
+        wrinkleScale: new THREE.Vector2(1, 1),
+        causticBoost: 2.35
+      });
+      groundMesh = new THREE.Mesh(
+        makeGroundDiscGeometry(GROUND_DISC.x, GROUND_DISC.y, GROUND_DISC.radius, 0, 160),
+        groundMaterial
+      );
+      scene.add(groundMesh);
+
+      shadowGroundMesh = new THREE.Mesh(
+        makeGroundDiscGeometry(GROUND_DISC.x, GROUND_DISC.y, GROUND_DISC.radius, SHADOW_SURFACE_OFFSET, 160),
+        makeLightReceiverMaterial(0.16)
+      );
+      shadowGroundMesh.receiveShadow = true;
+      shadowGroundMesh.renderOrder = 3;
+      scene.add(shadowGroundMesh);
+
+      wallMaterial = makeCausticSurfaceMaterial({
+        axis: 'wall',
+        baseColor: new THREE.Color(0x020202),
+        surfaceTint: new THREE.Color(0xb6b6b6),
+        textureScale: new THREE.Vector2(0.56, 0.56),
+        textureStrength: 0.86,
+        textureGamma: 0.78,
+        wrinkleStrength: 0.13,
+        wrinkleScale: new THREE.Vector2(8.5, 5.5),
+        causticBoost: 2.75
+      });
+      wallMesh = new THREE.Mesh(makeReceiverGeometry(WALL_VISUAL_BOUNDS), wallMaterial);
+      scene.add(wallMesh);
+
+      wallBoardMaterial = makeCausticSurfaceMaterial({
+        axis: 'wall',
+        baseColor: new THREE.Color(0x020202),
+        surfaceTint: new THREE.Color(0x8a8a8a),
+        textureScale: new THREE.Vector2(0.56, 0.56),
+        textureStrength: 0.9,
+        textureGamma: 0.82,
+        wrinkleStrength: 0.1,
+        wrinkleScale: new THREE.Vector2(8.5, 5.5),
+        causticBoost: 0
+      });
+      wallBoardMesh = new THREE.Mesh(makeReceiverBoardGeometry(WALL_VISUAL_BOUNDS, RECEIVER_BOARD_THICKNESS), wallBoardMaterial);
+      wallBoardMesh.receiveShadow = true;
+      scene.add(wallBoardMesh);
+
+      shadowWallMesh = new THREE.Mesh(makeReceiverGeometry(WALL_VISUAL_BOUNDS), makeLightReceiverMaterial(0.22));
+      shadowWallMesh.receiveShadow = true;
+      shadowWallMesh.renderOrder = 3;
+      scene.add(shadowWallMesh);
+      updateReceiverTransform();
+
+      lightArrows = makeLightArrows();
+      scene.add(lightArrows);
+      applyDisplayToggles();
+    }
+
+    function setupInput() {
+      modelSelect.disabled = true;
+      modelSelect.addEventListener('change', () => {
+        currentModelIndex = Number(modelSelect.value);
+        resetAllControls();
+        loadModel(modelConfigs[currentModelIndex]).catch(handleModelLoadError);
+      });
+
+      for (const [key, config] of Object.entries(controls)) {
+        config.min = Number(config.input.min);
+        config.max = Number(config.input.max);
+        config.animButton = document.querySelector(`[data-animate="${key}"]`);
+        config.resetButton = document.querySelector(`[data-reset="${key}"]`);
+        config.input.addEventListener('input', () => {
+          applyControlValue(key, Number(config.input.value));
+          if (config.trace) {
+            scheduleCausticUpdate();
+          } else if (causticData) {
+            updateCausticTextures(state.exposure);
+          }
+        });
+      }
+      document.querySelectorAll('[data-animate]').forEach((button) => {
+        button.addEventListener('click', () => {
+          toggleControlAnimation(button.dataset.animate, button);
+        });
+      });
+
+      document.querySelectorAll('[data-reset]').forEach((button) => {
+        button.addEventListener('click', () => {
+          resetControl(button.dataset.reset);
+        });
+      });
+
+      toggleRaysButton.addEventListener('click', () => {
+        viewState.rays = !viewState.rays;
+        applyDisplayToggles();
+      });
+
+      toggleFloorButton.addEventListener('click', () => {
+        viewState.floor = !viewState.floor;
+        applyDisplayToggles();
+      });
+
+      toggleShadowButton.addEventListener('click', () => {
+        viewState.shadow = !viewState.shadow;
+        applyDisplayToggles();
+      });
+
+      collapseHudButton.addEventListener('click', () => {
+        viewState.collapsed = !viewState.collapsed;
+        applyDisplayToggles();
+      });
+
+      renderer.domElement.addEventListener('pointerdown', (event) => {
+        pointerState.active = true;
+        pointerState.x = event.clientX;
+        pointerState.y = event.clientY;
+        renderer.domElement.setPointerCapture(event.pointerId);
+      });
+
+      renderer.domElement.addEventListener('pointermove', (event) => {
+        if (!pointerState.active) return;
+        const dx = event.clientX - pointerState.x;
+        const dy = event.clientY - pointerState.y;
+        pointerState.x = event.clientX;
+        pointerState.y = event.clientY;
+        orbit.yaw -= dx * 0.006;
+        orbit.pitch = THREE.MathUtils.clamp(orbit.pitch + dy * 0.0045, -0.05, 1.25);
+        updateCamera();
+      });
+
+      renderer.domElement.addEventListener('pointerup', (event) => {
+        pointerState.active = false;
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      });
+
+      renderer.domElement.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * 0.003, 2.3, 8.5);
+        updateCamera();
+      }, { passive: false });
+
+      window.addEventListener('resize', updateRendererSize);
+      window.visualViewport?.addEventListener('resize', updateRendererSize);
+
+      renderer.domElement.addEventListener('dblclick', (event) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const pointer = new THREE.Vector2(
+          ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          -((event.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(pointer, camera);
+        const hit = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(raycasterPlane, hit)) {
+          cameraTarget.lerp(hit, 0.65);
+          updateCamera();
+        }
+      });
+    }
+
+    function populateModelSelect() {
+      modelSelect.textContent = '';
+      modelConfigs.forEach((model, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = model.label;
+        modelSelect.append(option);
+      });
+      currentModelIndex = Math.min(currentModelIndex, Math.max(modelConfigs.length - 1, 0));
+      modelSelect.value = String(currentModelIndex);
+      modelSelect.disabled = !modelConfigs.length;
+    }
+
+    function setToggleButton(button, active) {
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+
+    function applyDisplayToggles() {
+      setToggleButton(toggleRaysButton, viewState.rays);
+      setToggleButton(toggleFloorButton, viewState.floor);
+      setToggleButton(toggleShadowButton, viewState.shadow);
+      hudEl.classList.toggle('collapsed', viewState.collapsed);
+      collapseHudButton.setAttribute('aria-expanded', String(!viewState.collapsed));
+      collapseHudButton.setAttribute('aria-label', viewState.collapsed ? 'Expand controls' : 'Collapse controls');
+      collapseHudButton.title = viewState.collapsed ? 'Expand controls' : 'Collapse controls';
+
+      if (groundMesh) groundMesh.visible = viewState.floor;
+      if (groundGrid) groundGrid.visible = viewState.floor;
+      if (shadowGroundMesh) shadowGroundMesh.visible = viewState.floor && viewState.shadow;
+      if (shadowWallMesh) shadowWallMesh.visible = viewState.shadow;
+      setRayVisibility(activeAnimations.size === 0);
+    }
+
+    function stopControlAnimations() {
+      activeAnimations.clear();
+      document.querySelectorAll('.anim-button.active').forEach((button) => {
+        button.classList.remove('active');
+      });
+      applyDisplayToggles();
+    }
+
+    function formatDegree(value) {
+      return `${value.toFixed(1).replace('.0', '')}°`;
+    }
+
+    function applyControlValue(key, value) {
+      const config = controls[key];
+      state[config.stateKey] = config.toState ? config.toState(value) : value;
+      config.input.value = String(value);
+      config.valueEl.textContent = config.format(value);
+      config.onChange();
+    }
+
+    function toggleControlAnimation(key, button) {
+      if (activeAnimations.has(key)) {
+        activeAnimations.delete(key);
+        button.classList.remove('active');
+      } else {
+        const config = controls[key];
+        activeAnimations.set(key, {
+          start: performance.now(),
+          startValue: Number(config.input.value)
+        });
+        button.classList.add('active');
+      }
+
+      setRayVisibility(activeAnimations.size === 0);
+
+      if (activeAnimations.size === 0) {
+        runCausticUpdate(true);
+      } else {
+        runCausticUpdate(false);
+      }
+    }
+
+    function resetAllControls() {
+      stopControlAnimations();
+      for (const [key, config] of Object.entries(controls)) {
+        applyControlValue(key, config.defaultValue);
+      }
+      if (causticData) updateCausticTextures(state.exposure);
+      setRayVisibility(true);
+    }
+
+    function resetControl(key) {
+      const config = controls[key];
+      if (!config) return;
+
+      if (activeAnimations.has(key)) {
+        activeAnimations.delete(key);
+        config.animButton?.classList.remove('active');
+      }
+
+      applyControlValue(key, config.defaultValue);
+      setRayVisibility(activeAnimations.size === 0);
+
+      if (config.trace) {
+        scheduleCausticUpdate();
+      } else if (causticData) {
+        updateCausticTextures(state.exposure);
+      }
+    }
+
+    function updateAnimatedControls(time) {
+      if (!activeAnimations.size) return;
+
+      let traceChanged = false;
+      let textureOnly = false;
+      for (const [key, animation] of activeAnimations.entries()) {
+        const config = controls[key];
+        const range = config.max - config.min;
+        const elapsed = Math.max(0, time - animation.start);
+        let value = animation.startValue + (elapsed / config.duration) * range;
+        if (value > config.max) {
+          value = config.min + ((value - config.min) % range);
+        }
+        applyControlValue(key, value);
+        traceChanged = traceChanged || config.trace;
+        textureOnly = textureOnly || !config.trace;
+      }
+
+      if (traceChanged) {
+        runCausticUpdate(false);
+      } else if (textureOnly && causticData) {
+        updateCausticTextures(state.exposure);
+        statusEl.textContent = 'realtime';
+      }
+    }
+
+    function scheduleCausticUpdate() {
+      if (computeQueued) return;
+      computeQueued = true;
+      requestAnimationFrame(() => {
+        computeQueued = false;
+        runCausticUpdate(activeAnimations.size === 0);
+      });
+    }
+
+    function runCausticUpdate(updateRays) {
+      if (!modelData || !wallTexture || !groundTexture) return;
+
+      statusEl.textContent = 'tracing rays';
+      causticData = computeCaustics(modelData, state, CAUSTIC_QUALITY, updateRays && activeAnimations.size === 0);
+      updateCausticTextures(state.exposure);
+      if (updateRays && activeAnimations.size === 0) {
+        updateRayLines(causticData.raySegments);
+        setRayVisibility(true);
+      } else {
+        setRayVisibility(false);
+      }
+      meshInfoEl.textContent = `${modelData.meshRes} / ${causticData.validRays.toLocaleString()}`;
+      statusEl.textContent = 'realtime';
+    }
+
+    function updateLensTransform() {
+      if (!lensMesh) return;
+      lensMesh.setRotationFromMatrix(makeLensRotationMatrix(state));
+    }
+
+    function updateLensMaterial() {
+      if (!lensMaterial) return;
+      lensMaterial.ior = state.ior;
+      lensMaterial.needsUpdate = true;
+    }
+
+    function updateExposureOnly() {
+      if (causticData) updateCausticTextures(state.exposure);
+    }
+
+    function updateReceiverTransform() {
+      const receiverX = -state.receiverDistance;
+      if (wallMesh) wallMesh.position.x = receiverX;
+      if (wallBoardMesh) wallBoardMesh.position.x = receiverX;
+      if (shadowWallMesh) shadowWallMesh.position.x = receiverX + SHADOW_SURFACE_OFFSET;
+    }
+
+    async function parseModelResponse(response, modelConfig) {
+      const payload = await readModelPayload(response, modelConfig);
+      if (modelConfig.format === 'stl') {
+        return parseStlModel(payload);
+      }
+      return parseObjModel(new TextDecoder().decode(payload));
+    }
+
+    async function readModelPayload(response, modelConfig) {
+      const payload = await response.arrayBuffer();
+      if (modelConfig.compression !== 'gzip' || !isGzipPayload(payload)) return payload;
+      return decompressGzip(payload);
+    }
+
+    function isGzipPayload(arrayBuffer) {
+      const bytes = new Uint8Array(arrayBuffer, 0, Math.min(arrayBuffer.byteLength, 2));
+      return bytes.length === 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+    }
+
+    async function decompressGzip(arrayBuffer) {
+      if (!('DecompressionStream' in window)) {
+        throw new Error('Gzip model loading requires browser DecompressionStream support');
+      }
+
+      const stream = new Blob([arrayBuffer]).stream().pipeThrough(new DecompressionStream('gzip'));
+      return new Response(stream).arrayBuffer();
+    }
+
+    function parseObjModel(text) {
+      const rawPositions = [];
+      const rawFaces = [];
+      const lines = text.split('\n');
+
+      for (const rawLine of lines) {
+        if (!rawLine || rawLine.charCodeAt(0) === 35) continue;
+        const line = rawLine.trim();
+        if (line.startsWith('v ')) {
+          const parts = line.split(/\s+/);
+          rawPositions.push([Number(parts[1]), Number(parts[2]), Number(parts[3])]);
+        } else if (line.startsWith('f ')) {
+          rawFaces.push(line.slice(2).trim().split(/\s+/).map((token) => Number(token.split('/')[0]) - 1));
+        }
+      }
+
+      const positions = flattenObjPositions(rawPositions);
+      const indices = triangulateFaces(rawFaces);
+      return createModelFromMeshData(positions, indices);
+    }
+
+    function parseStlModel(arrayBuffer) {
+      const sourceGeometry = stlLoader.parse(arrayBuffer);
+      const positionAttribute = sourceGeometry.getAttribute('position');
+      if (!positionAttribute || positionAttribute.itemSize !== 3) {
+        sourceGeometry.dispose();
+        throw new Error('STL has no usable vertices');
+      }
+
+      const positions = positionAttribute.array.slice
+        ? positionAttribute.array.slice()
+        : new Float32Array(positionAttribute.array);
+      const indices = sourceGeometry.index
+        ? cloneIndexArray(sourceGeometry.index.array)
+        : makeSequentialIndices(positionAttribute.count);
+      sourceGeometry.dispose();
+      return createModelFromMeshData(positions, indices);
+    }
+
+    function createModelFromMeshData(positions, indices) {
+      const traceGrid = buildFaceTraceGrid(positions, indices);
+      const positionBuffer = positions instanceof Float32Array ? positions : new Float32Array(positions);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positionBuffer, 3));
+      geometry.setIndex(makeIndexAttribute(indices, positionBuffer.length / 3));
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+
+      return {
+        geometry,
+        positions,
+        traceGrid,
+        gridSize: traceGrid.sampleCount,
+        meshRes: traceGrid.sampleCount.toLocaleString()
+      };
+    }
+
+    function cloneIndexArray(source) {
+      if (source instanceof Uint32Array) return new Uint32Array(source);
+      if (source instanceof Uint16Array) return new Uint16Array(source);
+      let maxIndex = 0;
+      for (let i = 0; i < source.length; i += 1) maxIndex = Math.max(maxIndex, source[i]);
+      return maxIndex > 65535
+        ? new Uint32Array(source)
+        : new Uint16Array(source);
+    }
+
+    function makeSequentialIndices(count) {
+      const indices = count > 65535 ? new Uint32Array(count) : new Uint16Array(count);
+      for (let index = 0; index < count; index += 1) indices[index] = index;
+      return indices;
+    }
+
+    function makeIndexAttribute(indices, vertexCount) {
+      if (indices instanceof Uint32Array || vertexCount > 65535) {
+        return new THREE.Uint32BufferAttribute(indices, 1);
+      }
+      if (indices instanceof Uint16Array) {
+        return new THREE.Uint16BufferAttribute(indices, 1);
+      }
+      return vertexCount > 65535
+        ? new THREE.Uint32BufferAttribute(indices, 1)
+        : new THREE.Uint16BufferAttribute(indices, 1);
+    }
+
+    function flattenObjPositions(rawPositions) {
+      if (!rawPositions.length) {
+        throw new Error('OBJ has no usable vertices');
+      }
+
+      const positions = [];
+      for (const source of rawPositions) {
+        positions.push(source[0], source[1], source[2]);
+      }
+      return positions;
+    }
+
+    function triangulateFaces(rawFaces) {
+      const indices = [];
+      for (const face of rawFaces) {
+        for (let i = 1; i < face.length - 1; i += 1) {
+          indices.push(face[0], face[i], face[i + 1]);
+        }
+      }
+      return indices;
+    }
+
+    function buildFaceTraceGrid(positions, indices) {
+      const faceSamples = [];
+      let minHeight = Infinity;
+      let maxHeight = -Infinity;
+
+      for (let i = 0; i < indices.length; i += 3) {
+        const ia = indices[i] * 3;
+        const ib = indices[i + 1] * 3;
+        const ic = indices[i + 2] * 3;
+        const ax = positions[ia];
+        const ay = positions[ia + 1];
+        const az = positions[ia + 2];
+        const bx = positions[ib];
+        const by = positions[ib + 1];
+        const bz = positions[ib + 2];
+        const cx = positions[ic];
+        const cy = positions[ic + 1];
+        const cz = positions[ic + 2];
+        const ux = bx - ax;
+        const uy = by - ay;
+        const uz = bz - az;
+        const vx = cx - ax;
+        const vy = cy - ay;
+        const vz = cz - az;
+        const nx = uy * vz - uz * vy;
+        const ny = uz * vx - ux * vz;
+        const nz = ux * vy - uy * vx;
+        const invLen = 1 / (Math.hypot(nx, ny, nz) || 1);
+        const normalX = nx * invLen;
+        const normalY = ny * invLen;
+        const normalZ = nz * invLen;
+
+        const surfaceX = (ax + bx + cx) / 3;
+        const surfaceY = (ay + by + cy) / 3;
+        const surfaceZ = (az + bz + cz) / 3;
+        minHeight = Math.min(minHeight, surfaceZ);
+        maxHeight = Math.max(maxHeight, surfaceZ);
+        faceSamples.push(surfaceX, surfaceY, surfaceZ, normalX, normalY, normalZ);
+      }
+
+      if (!faceSamples.length) {
+        throw new Error('Could not find the optical surface in this OBJ');
+      }
+
+      const step = Math.max(1, Math.ceil(faceSamples.length / 6 / MAX_TRACE_SAMPLES));
+      const sampleCount = Math.ceil(faceSamples.length / 6 / step);
+      const surfaceX = new Float32Array(sampleCount);
+      const surfaceY = new Float32Array(sampleCount);
+      const surfaceZ = new Float32Array(sampleCount);
+      const normalX = new Float32Array(sampleCount);
+      const normalY = new Float32Array(sampleCount);
+      const normalZ = new Float32Array(sampleCount);
+      let target = 0;
+
+      for (let source = 0; source < faceSamples.length / 6; source += step) {
+        const offset = source * 6;
+        surfaceX[target] = faceSamples[offset];
+        surfaceY[target] = faceSamples[offset + 1];
+        surfaceZ[target] = faceSamples[offset + 2];
+        normalX[target] = faceSamples[offset + 3];
+        normalY[target] = faceSamples[offset + 4];
+        normalZ[target] = faceSamples[offset + 5];
+        target += 1;
+      }
+
+      return {
+        surfaceX,
+        surfaceY,
+        surfaceZ,
+        normalX,
+        normalY,
+        normalZ,
+        sampleCount: target,
+        gridSize: target,
+        minHeight,
+        maxHeight
+      };
+    }
+
+    function makeLensRotationMatrix(settings) {
+      rotationYScratch.makeRotationY(THREE.MathUtils.degToRad(settings.rotationY));
+      rotationXScratch.makeRotationX(THREE.MathUtils.degToRad(settings.rotationX));
+      rotationZScratch.makeRotationZ(THREE.MathUtils.degToRad(settings.rotationZ));
+      return rotationMatrixScratch.copy(rotationYScratch).multiply(rotationXScratch).multiply(rotationZScratch);
+    }
+
+    function computeCaustics(model, settings, quality, collectRaySegments) {
+      const width = CAUSTIC_SIZE;
+      const height = CAUSTIC_SIZE;
+      const soften = quality.soften;
+      const blurPasses = quality.blurPasses;
+      const exposureBoost = quality.exposureBoost;
+      const trace = model.traceGrid ?? model;
+      const sampleCount = trace.sampleCount ?? trace.gridSize * trace.gridSize;
+      const work = getCausticWork(sampleCount, width * height);
+      const wallEnergy = work.wallEnergy;
+      const groundEnergy = work.groundEnergy;
+      const wallHitU = work.wallHitU;
+      const wallHitV = work.wallHitV;
+      const groundHitU = work.groundHitU;
+      const groundHitV = work.groundHitV;
+      const rayCandidates = collectRaySegments ? [] : null;
+      const raySampleTarget = rayCandidates ? makeRaySampleTarget(sampleCount) : 0;
+      const receiverX = -settings.receiverDistance;
+      const eta = settings.ior;
+      const rotation = makeLensRotationMatrix(settings);
+      const e = rotation.elements;
+      let validRays = 0;
+      let wallHitCount = 0;
+      let groundHitCount = 0;
+
+      for (let index = 0; index < sampleCount; index += 1) {
+          const lx = trace.surfaceX[index];
+          const ly = trace.surfaceY[index];
+          const lz = trace.surfaceZ[index];
+
+          const lnx = trace.normalX[index];
+          const lny = trace.normalY[index];
+          const lnz = trace.normalZ[index];
+
+          const hitX = e[0] * lx + e[4] * ly + e[8] * lz + LENS_POSITION.x;
+          const hitY = e[1] * lx + e[5] * ly + e[9] * lz + LENS_POSITION.y;
+          const hitZ = e[2] * lx + e[6] * ly + e[10] * lz + LENS_POSITION.z;
+          let normalX = e[0] * lnx + e[4] * lny + e[8] * lnz;
+          let normalY = e[1] * lnx + e[5] * lny + e[9] * lnz;
+          let normalZ = e[2] * lnx + e[6] * lny + e[10] * lnz;
+          // Keep the transverse slope when the lens is flipped; otherwise the optical power changes sign.
+          normalX = -Math.abs(normalX);
+
+          const cosI = -normalX;
+          const tangentX = -1 - cosI * normalX;
+          const tangentY = -cosI * normalY;
+          const tangentZ = -cosI * normalZ;
+          const tangentLen2 = tangentX * tangentX + tangentY * tangentY + tangentZ * tangentZ;
+          const refractedTangentLen2 = eta * eta * tangentLen2;
+          if (refractedTangentLen2 >= 1) continue;
+
+          const cosT = Math.sqrt(1 - refractedTangentLen2);
+          const directionX = eta * tangentX + cosT * normalX;
+          const directionY = eta * tangentY + cosT * normalY;
+          const directionZ = eta * tangentZ + cosT * normalZ;
+
+          let wallT = Infinity;
+          if (directionX < -0.0001) {
+            wallT = (receiverX - hitX) / directionX;
+            if (wallT <= 0) wallT = Infinity;
+          }
+
+          let groundT = Infinity;
+          if (directionZ < -0.0001) {
+            groundT = -hitZ / directionZ;
+            if (groundT <= 0) groundT = Infinity;
+          }
+
+          if (!Number.isFinite(wallT) && !Number.isFinite(groundT)) continue;
+
+          validRays += 1;
+
+          const wallFirst = wallT <= groundT;
+          const groundFirst = groundT < wallT;
+
+          if (wallFirst) {
+            const wallY = hitY + directionY * wallT;
+            const wallZ = hitZ + directionZ * wallT;
+            if (
+              Number.isFinite(wallY) &&
+              Number.isFinite(wallZ) &&
+              isInside(wallY, WALL_VISUAL_BOUNDS.yMin, WALL_VISUAL_BOUNDS.yMax) &&
+              isInside(wallZ, WALL_VISUAL_BOUNDS.zMin, WALL_VISUAL_BOUNDS.zMax)
+            ) {
+              wallHitU[wallHitCount] = wallY;
+              wallHitV[wallHitCount] = wallZ;
+              wallHitCount += 1;
+            }
+          }
+
+          if (groundFirst) {
+            const groundX = hitX + directionX * groundT;
+            const groundY = hitY + directionY * groundT;
+            if (
+              Number.isFinite(groundX) &&
+              Number.isFinite(groundY) &&
+              isInside(groundX, GROUND_VISUAL_BOUNDS.xMin, GROUND_VISUAL_BOUNDS.xMax) &&
+              isInside(groundY, GROUND_VISUAL_BOUNDS.yMin, GROUND_VISUAL_BOUNDS.yMax)
+            ) {
+              groundHitU[groundHitCount] = groundX;
+              groundHitV[groundHitCount] = groundY;
+              groundHitCount += 1;
+            }
+          }
+
+          if (rayCandidates && raySampleTarget > 0) {
+            const distance = groundT < wallT ? groundT : wallT;
+            const x = hitX + directionX * distance;
+            const y = hitY + directionY * distance;
+            const z = hitZ + directionZ * distance;
+            addRayCandidate(rayCandidates, raySampleTarget, sampleHash(index, 17), [
+              1.15, hitY, hitZ,
+              hitX, hitY, hitZ,
+              hitX, hitY, hitZ,
+              x, y, z
+            ]);
+          }
+      }
+
+      const wallWindow = makeSampleWindow(wallHitU, wallHitV, wallHitCount, DEFAULT_WALL_WINDOW, 1.05, 0.9, work.wallSortU, work.wallSortV);
+      const groundWindow = makeSampleWindow(groundHitU, groundHitV, groundHitCount, DEFAULT_GROUND_WINDOW, 2.2, 2.2, work.groundSortU, work.groundSortV);
+
+      for (let i = 0; i < wallHitCount; i += 1) {
+        splat(wallEnergy, width, height, wallWindow, wallHitU[i], wallHitV[i], 1);
+      }
+
+      for (let i = 0; i < groundHitCount; i += 1) {
+        splat(groundEnergy, width, height, groundWindow, groundHitU[i], groundHitV[i], 1);
+      }
+
+      for (let pass = 0; pass < blurPasses; pass += 1) {
+        softenEnergy(wallEnergy, width, height, soften, work.blurScratch);
+        softenEnergy(groundEnergy, width, height, soften, work.blurScratch);
+      }
+
+      const wallPeak = peakEnergy(wallEnergy, work.peakHistogram);
+      const groundPeak = peakEnergy(groundEnergy, work.peakHistogram);
+      const raySegments = rayCandidates ? flattenRayCandidates(rayCandidates) : [];
+      return { model, wallEnergy, groundEnergy, width, height, wallPeak, groundPeak, wallWindow, groundWindow, validRays, raySegments, exposureBoost };
+    }
+
+    function getCausticWork(sampleCapacity, pixelCount) {
+      if (
+        !causticWork ||
+        causticWork.sampleCapacity < sampleCapacity ||
+        causticWork.pixelCount !== pixelCount
+      ) {
+        causticWork = {
+          sampleCapacity,
+          pixelCount,
+          wallEnergy: new Float32Array(pixelCount),
+          groundEnergy: new Float32Array(pixelCount),
+          blurScratch: new Float32Array(pixelCount),
+          peakHistogram: new Uint32Array(1024),
+          wallHitU: new Float32Array(sampleCapacity),
+          wallHitV: new Float32Array(sampleCapacity),
+          groundHitU: new Float32Array(sampleCapacity),
+          groundHitV: new Float32Array(sampleCapacity),
+          wallSortU: new Float32Array(sampleCapacity),
+          wallSortV: new Float32Array(sampleCapacity),
+          groundSortU: new Float32Array(sampleCapacity),
+          groundSortV: new Float32Array(sampleCapacity)
+        };
+      } else {
+        causticWork.wallEnergy.fill(0);
+        causticWork.groundEnergy.fill(0);
+      }
+
+      return causticWork;
+    }
+
+    function makeRaySampleTarget(sampleCount) {
+      return Math.min(RAY_LINE_MAX, Math.max(RAY_LINE_MIN, Math.ceil(sampleCount / RAY_LINE_DENSITY)));
+    }
+
+    function addRayCandidate(candidates, target, rank, values) {
+      if (candidates.length < target) {
+        candidates.push({ rank, values });
+        return;
+      }
+
+      let weakestIndex = 0;
+      let weakestRank = candidates[0].rank;
+      for (let i = 1; i < candidates.length; i += 1) {
+        if (candidates[i].rank > weakestRank) {
+          weakestIndex = i;
+          weakestRank = candidates[i].rank;
+        }
+      }
+
+      if (rank < weakestRank) candidates[weakestIndex] = { rank, values };
+    }
+
+    function flattenRayCandidates(candidates) {
+      candidates.sort((a, b) => a.rank - b.rank);
+      const segments = [];
+      for (const candidate of candidates) segments.push(...candidate.values);
+      return segments;
+    }
+
+    function sampleHash(index, salt) {
+      let value = Math.imul(index + 0x9e3779b9, 0x85ebca6b) ^ Math.imul(salt + 0xc2b2ae35, 0x27d4eb2d);
+      value ^= value >>> 16;
+      value = Math.imul(value, 0x7feb352d);
+      value ^= value >>> 15;
+      value = Math.imul(value, 0x846ca68b);
+      value ^= value >>> 16;
+      return (value >>> 0) / 4294967296;
+    }
+
+    function isInside(value, min, max) {
+      return value >= min && value <= max;
+    }
+
+    function splat(target, width, height, area, horizontal, vertical, amount) {
+      const u = (horizontal - area.uMin) / (area.uMax - area.uMin);
+      const v = (vertical - area.vMin) / (area.vMax - area.vMin);
+      if (u < 0 || u > 1 || v < 0 || v > 1) return;
+
+      const px = u * (width - 1);
+      const py = v * (height - 1);
+      const ix = Math.floor(px);
+      const iy = Math.floor(py);
+      const fx = px - ix;
+      const fy = py - iy;
+      const ix1 = Math.min(width - 1, ix + 1);
+      const iy1 = Math.min(height - 1, iy + 1);
+      const row = iy * width;
+      const row1 = iy1 * width;
+
+      target[row + ix] += amount * (1 - fx) * (1 - fy);
+      target[row + ix1] += amount * fx * (1 - fy);
+      target[row1 + ix] += amount * (1 - fx) * fy;
+      target[row1 + ix1] += amount * fx * fy;
+    }
+
+    function makeSampleWindow(hitU, hitV, count, fallback, minSpanU, minSpanV, sortU, sortV) {
+      if (!count) return { ...fallback };
+
+      sortU.set(hitU.subarray(0, count));
+      sortV.set(hitV.subarray(0, count));
+      const sortedU = sortU.subarray(0, count);
+      const sortedV = sortV.subarray(0, count);
+      sortedU.sort();
+      sortedV.sort();
+
+      const lo = Math.floor((count - 1) * 0.006);
+      const hi = Math.ceil((count - 1) * 0.994);
+      const uMin = sortedU[lo];
+      const uMax = sortedU[hi];
+      const vMin = sortedV[lo];
+      const vMax = sortedV[hi];
+
+      if (!Number.isFinite(uMin) || !Number.isFinite(uMax) || !Number.isFinite(vMin) || !Number.isFinite(vMax)) {
+        return { ...fallback };
+      }
+
+      return expandWindow(uMin, uMax, vMin, vMax, minSpanU, minSpanV);
+    }
+
+    function expandWindow(uMin, uMax, vMin, vMax, minSpanU, minSpanV) {
+      const centerU = (uMin + uMax) * 0.5;
+      const centerV = (vMin + vMax) * 0.5;
+      const spanU = Math.max(uMax - uMin, minSpanU);
+      const spanV = Math.max(vMax - vMin, minSpanV);
+      const paddedU = spanU * 1.12;
+      const paddedV = spanV * 1.12;
+
+      return {
+        uMin: centerU - paddedU * 0.5,
+        uMax: centerU + paddedU * 0.5,
+        vMin: centerV - paddedV * 0.5,
+        vMax: centerV + paddedV * 0.5
+      };
+    }
+
+    function softenEnergy(energy, width, height, amount, scratch) {
+      if (amount <= 0) return;
+      scratch.set(energy);
+      const centerWeight = 1 - amount;
+      const sideWeight = amount * 0.25;
+
+      for (let y = 0; y < height; y += 1) {
+        const row = y * width;
+        const up = Math.min(height - 1, y + 1) * width;
+        const down = Math.max(0, y - 1) * width;
+
+        for (let x = 0; x < width; x += 1) {
+          const left = Math.max(0, x - 1);
+          const right = Math.min(width - 1, x + 1);
+          energy[row + x] =
+            scratch[row + x] * centerWeight +
+            (scratch[row + left] + scratch[row + right] + scratch[down + x] + scratch[up + x]) * sideWeight;
+        }
+      }
+    }
+
+    function peakEnergy(energy, histogram) {
+      let max = 0;
+      let count = 0;
+      for (let i = 0; i < energy.length; i += 1) {
+        const value = energy[i];
+        if (value > 0) {
+          count += 1;
+          if (value > max) max = value;
+        }
+      }
+      if (!count || max <= 0) return 0;
+
+      histogram.fill(0);
+      const lastBin = histogram.length - 1;
+      const scale = lastBin / max;
+      for (let i = 0; i < energy.length; i += 1) {
+        const value = energy[i];
+        if (value > 0) histogram[Math.min(lastBin, Math.floor(value * scale))] += 1;
+      }
+
+      const target = Math.max(1, Math.floor(count * 0.996));
+      let accumulated = 0;
+      for (let bin = 0; bin <= lastBin; bin += 1) {
+        accumulated += histogram[bin];
+        if (accumulated >= target) return Math.max((bin + 0.5) / scale, 0.0001);
+      }
+      return max;
+    }
+
+    function updateCausticTextures(exposure) {
+      if (!causticData || !wallTexture || !groundTexture) return;
+
+      const boostedExposure = exposure * (causticData.exposureBoost ?? 1);
+      const sharedPeak = Math.max(causticData.wallPeak, causticData.groundPeak, 0.0001);
+      applyCausticWindow(wallMaterial, causticData.wallWindow);
+      applyCausticWindow(groundMaterial, causticData.groundWindow);
+      updateTextureData(wallTexture, causticData.wallEnergy, sharedPeak, boostedExposure);
+      updateTextureData(groundTexture, causticData.groundEnergy, sharedPeak, boostedExposure);
+    }
+
+    function applyCausticWindow(material, window) {
+      if (!material || !window) return;
+      material.uniforms.causticMin.value.set(window.uMin, window.vMin);
+      material.uniforms.causticInvSize.value.set(
+        1 / Math.max(window.uMax - window.uMin, 0.0001),
+        1 / Math.max(window.vMax - window.vMin, 0.0001)
+      );
+    }
+
+    function updateTextureData(texture, energy, peak, exposure) {
+      const data = texture.image.data;
+      const scale = (5.4 * exposure) / Math.max(peak, 0.0001);
+
+      for (let i = 0; i < energy.length; i += 1) {
+        const mapped = 1 - Math.exp(-energy[i] * scale);
+        const intensity = Math.pow(mapped, 0.68);
+        const offset = i * 4;
+        const value = Math.min(255, intensity * 255);
+        data[offset] = value;
+        data[offset + 1] = value;
+        data[offset + 2] = value;
+        data[offset + 3] = 255;
+      }
+
+      texture.needsUpdate = true;
+    }
+
+    function createCausticTexture() {
+      const pixels = new Uint8Array(CAUSTIC_SIZE * CAUSTIC_SIZE * 4);
+      const texture = new THREE.DataTexture(pixels, CAUSTIC_SIZE, CAUSTIC_SIZE, THREE.RGBAFormat);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = false;
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return texture;
+    }
+
+    function createSolidTexture(hexColor) {
+      const color = new THREE.Color(hexColor);
+      const pixels = new Uint8Array([
+        Math.round(color.r * 255),
+        Math.round(color.g * 255),
+        Math.round(color.b * 255),
+        255
+      ]);
+      const texture = new THREE.DataTexture(pixels, 1, 1, THREE.RGBAFormat);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    function makeCausticSurfaceMaterial(options) {
+      const {
+        axis,
+        baseColor,
+        surfaceTint,
+        textureScale,
+        textureStrength,
+        textureGamma,
+        wrinkleStrength,
+        wrinkleScale,
+        causticBoost
+      } = options;
+      const sampleCoord = axis === 'ground' ? 'vWorldPosition.xy' : 'vWorldPosition.yz';
+      return new THREE.ShaderMaterial({
+        uniforms: {
+          causticMap: { value: fallbackCausticTexture },
+          surfaceMap: { value: fallbackSurfaceTexture },
+          baseColor: { value: baseColor },
+          surfaceTint: { value: surfaceTint },
+          causticMin: { value: new THREE.Vector2() },
+          causticInvSize: { value: new THREE.Vector2(1, 1) },
+          textureScale: { value: textureScale },
+          textureStrength: { value: textureStrength },
+          textureGamma: { value: textureGamma },
+          wrinkleStrength: { value: wrinkleStrength },
+          wrinkleScale: { value: wrinkleScale },
+          causticBoost: { value: causticBoost }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          varying vec3 vWorldPosition;
+          void main() {
+            vUv = uv;
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D causticMap;
+          uniform sampler2D surfaceMap;
+          uniform vec3 baseColor;
+          uniform vec3 surfaceTint;
+          uniform vec2 causticMin;
+          uniform vec2 causticInvSize;
+          uniform vec2 textureScale;
+          uniform float textureStrength;
+          uniform float textureGamma;
+          uniform float wrinkleStrength;
+          uniform vec2 wrinkleScale;
+          uniform float causticBoost;
+          varying vec2 vUv;
+          varying vec3 vWorldPosition;
+
+          void main() {
+            vec2 coord = ${sampleCoord};
+            vec2 causticUv = (coord - causticMin) * causticInvSize;
+            vec2 inside = step(vec2(0.0), causticUv) * step(causticUv, vec2(1.0));
+            float mask = inside.x * inside.y;
+            vec3 caustic = texture2D(causticMap, clamp(causticUv, vec2(0.0), vec2(1.0))).rgb * mask;
+            vec2 textureUv = coord * textureScale;
+            vec3 texel = texture2D(surfaceMap, textureUv).rgb;
+            vec3 surface = pow(max(texel, vec3(0.0001)), vec3(textureGamma)) * surfaceTint;
+            float wrinkleA = sin(coord.x * wrinkleScale.x + sin(coord.y * wrinkleScale.y * 0.58) * 1.7);
+            float wrinkleB = sin(coord.y * wrinkleScale.y * 1.17 + coord.x * wrinkleScale.x * 0.33);
+            float wrinkle = (wrinkleA * 0.65 + wrinkleB * 0.35) * 0.5 + 0.5;
+            surface *= mix(1.0, 0.88 + wrinkle * 0.24, wrinkleStrength);
+            vec3 color = mix(baseColor, surface, textureStrength) + caustic * causticBoost;
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `,
+        side: THREE.DoubleSide
+      });
+    }
+
+    function makeLensMaterial() {
+      return new THREE.MeshPhysicalMaterial({
+        color: 0xb7ecff,
+        roughness: 0.04,
+        metalness: 0,
+        transmission: 0.78,
+        thickness: 0.42,
+        ior: state.ior,
+        transparent: true,
+        opacity: 0.42,
+        side: THREE.DoubleSide,
+        clearcoat: 1,
+        clearcoatRoughness: 0.03
+      });
+    }
+
+    function makeLensShadowDepthMaterial() {
+      return new THREE.MeshDepthMaterial({
+        depthPacking: THREE.RGBADepthPacking,
+        side: THREE.DoubleSide
+      });
+    }
+
+    function makeLightReceiverMaterial(opacity) {
+      const material = new THREE.ShadowMaterial({
+        color: 0xffffff,
+        opacity
+      });
+      material.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          'opacity * ( 1.0 - getShadowMask() )',
+          'opacity * getShadowMask()'
+        );
+      };
+      material.transparent = true;
+      material.depthWrite = false;
+      material.blending = THREE.AdditiveBlending;
+      material.side = THREE.DoubleSide;
+      return material;
+    }
+
+    function makeReceiverGeometry(area) {
+      const positions = new Float32Array([
+        0, area.yMin, area.zMin,
+        0, area.yMax, area.zMin,
+        0, area.yMax, area.zMax,
+        0, area.yMin, area.zMax
+      ]);
+      const uvs = new Float32Array([
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 1
+      ]);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geometry.setIndex([0, 1, 2, 0, 2, 3]);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function makeReceiverBoardGeometry(area, thickness) {
+      const xFront = 0;
+      const xBack = -thickness;
+      const yMin = area.yMin;
+      const yMax = area.yMax;
+      const zMin = area.zMin;
+      const zMax = area.zMax;
+      const positions = new Float32Array([
+        xBack, yMax, zMin, xBack, yMin, zMin, xBack, yMin, zMax, xBack, yMax, zMax,
+        xFront, yMin, zMax, xBack, yMin, zMax, xBack, yMin, zMin, xFront, yMin, zMin,
+        xBack, yMax, zMax, xFront, yMax, zMax, xFront, yMax, zMin, xBack, yMax, zMin,
+        xFront, yMax, zMax, xBack, yMax, zMax, xBack, yMin, zMax, xFront, yMin, zMax,
+        xFront, yMin, zMin, xBack, yMin, zMin, xBack, yMax, zMin, xFront, yMax, zMin
+      ]);
+      const indices = [];
+      for (let face = 0; face < 5; face += 1) {
+        const base = face * 4;
+        indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function makeReceiverFrame(area) {
+      const vertices = [
+        0, area.yMin, area.zMin,
+        0, area.yMax, area.zMin,
+        0, area.yMax, area.zMin,
+        0, area.yMax, area.zMax,
+        0, area.yMax, area.zMax,
+        0, area.yMin, area.zMax,
+        0, area.yMin, area.zMax,
+        0, area.yMin, area.zMin
+      ];
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      return new THREE.LineSegments(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: 0xd8d8d8,
+          transparent: true,
+          opacity: 0.45
+        })
+      );
+    }
+
+    function makeGroundDiscGeometry(centerX, centerY, radius, z, segments) {
+      const positions = new Float32Array((segments + 2) * 3);
+      positions[0] = centerX;
+      positions[1] = centerY;
+      positions[2] = z;
+
+      for (let i = 0; i <= segments; i += 1) {
+        const angle = (i / segments) * Math.PI * 2;
+        const offset = (i + 1) * 3;
+        positions[offset] = centerX + Math.cos(angle) * radius;
+        positions[offset + 1] = centerY + Math.sin(angle) * radius;
+        positions[offset + 2] = z;
+      }
+
+      const indices = [];
+      for (let i = 1; i <= segments; i += 1) {
+        indices.push(0, i, i + 1);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function makeGroundGeometry(xMin, xMax, yMin, yMax, z) {
+      const positions = new Float32Array([
+        xMin, yMin, z,
+        xMax, yMin, z,
+        xMax, yMax, z,
+        xMin, yMax, z
+      ]);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setIndex([0, 1, 2, 0, 2, 3]);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function makeFloorGrid(xMin, xMax, yMin, yMax, z, step) {
+      const vertices = [];
+      for (let x = Math.ceil(xMin / step) * step; x <= xMax; x += step) {
+        vertices.push(x, yMin, z, x, yMax, z);
+      }
+      for (let y = Math.ceil(yMin / step) * step; y <= yMax; y += step) {
+        vertices.push(xMin, y, z, xMax, y, z);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      return new THREE.LineSegments(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: 0xb8b8b8,
+          transparent: true,
+          opacity: 0.13
+        })
+      );
+    }
+
+    function makeLightArrows() {
+      const group = new THREE.Group();
+      const yValues = [-0.42, 0, 0.42];
+      const zValues = [0.26, 0.74];
+      for (const y of yValues) {
+        for (const z of zValues) {
+          const arrow = new THREE.ArrowHelper(
+            new THREE.Vector3(-1, 0, 0),
+            new THREE.Vector3(1.05, y, z),
+            0.78,
+            0xdff8ff,
+            0.055,
+            0.028
+          );
+          arrow.cone.material.transparent = true;
+          arrow.cone.material.opacity = 0.55;
+          arrow.line.material.transparent = true;
+          arrow.line.material.opacity = 0.28;
+          group.add(arrow);
+        }
+      }
+      return group;
+    }
+
+    function updateRayLines(vertices) {
+      if (rayLines) {
+        scene.remove(rayLines);
+        rayLines.geometry.dispose();
+        rayLines.material.dispose();
+        rayLines = null;
+      }
+      if (!vertices.length) return;
+      rayLines = createRayLines(vertices);
+      scene.add(rayLines);
+    }
+
+    function setRayVisibility(visible) {
+      const shouldShow = visible && viewState.rays;
+      if (rayLines) rayLines.visible = shouldShow;
+      if (lightArrows) lightArrows.visible = shouldShow;
+    }
+
+    function createRayLines(vertices) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      return new THREE.LineSegments(
+        geometry,
+        new THREE.LineBasicMaterial({
+          color: 0x88e2ff,
+          transparent: true,
+          opacity: 0.18,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+    }
+
+    function updateCamera() {
+      const cp = Math.cos(orbit.pitch);
+      camera.position.set(
+        cameraTarget.x + orbit.radius * cp * Math.cos(orbit.yaw),
+        cameraTarget.y + orbit.radius * cp * Math.sin(orbit.yaw),
+        cameraTarget.z + orbit.radius * Math.sin(orbit.pitch)
+      );
+      camera.lookAt(cameraTarget);
+    }
+
+    function isMobileViewport() {
+      return Math.min(window.innerWidth, window.innerHeight) <= MOBILE_BREAKPOINT;
+    }
+
+    function getRendererPixelRatio() {
+      const cap = isMobileViewport() ? MOBILE_PIXEL_RATIO_CAP : DESKTOP_PIXEL_RATIO_CAP;
+      return Math.min(window.devicePixelRatio || 1, cap);
+    }
+
+    function getShadowMapSize() {
+      return isMobileViewport() ? MOBILE_SHADOW_SIZE : DESKTOP_SHADOW_SIZE;
+    }
+
+    function updateRendererSize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(getRendererPixelRatio());
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      updateShadowQuality();
+    }
+
+    function updateShadowQuality() {
+      if (!sunLight) return;
+      const size = getShadowMapSize();
+      if (sunLight.shadow.mapSize.x === size && sunLight.shadow.mapSize.y === size) return;
+      sunLight.shadow.mapSize.set(size, size);
+      sunLight.shadow.map?.dispose();
+      sunLight.shadow.map = null;
+      sunLight.shadow.needsUpdate = true;
+    }
+
+    function animate(time) {
+      const now = typeof time === 'number' ? time : performance.now();
+      requestAnimationFrame(animate);
+      updateAnimatedControls(now);
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
