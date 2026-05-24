@@ -715,6 +715,8 @@
     camera.up.set(0, 0, 1);
     const cameraTarget = new THREE.Vector3(-1.05, 0, 0.55);
     const orbit = { yaw: -0.82, pitch: 0.48, radius: 4.35 };
+    const ORBIT_RADIUS_MIN = 2.3;
+    const ORBIT_RADIUS_MAX = 8.5;
 
     const raycasterPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     const viewState = {
@@ -724,9 +726,12 @@
       collapsed: false
     };
     const pointerState = {
-      active: false,
-      x: 0,
-      y: 0
+      pointers: new Map(),
+      rotatePointerId: null,
+      lastX: 0,
+      lastY: 0,
+      pinchStartDistance: 0,
+      pinchStartRadius: orbit.radius
     };
 
     const controls = {
@@ -1196,32 +1201,14 @@
         applyDisplayToggles();
       });
 
-      renderer.domElement.addEventListener('pointerdown', (event) => {
-        pointerState.active = true;
-        pointerState.x = event.clientX;
-        pointerState.y = event.clientY;
-        renderer.domElement.setPointerCapture(event.pointerId);
-      });
-
-      renderer.domElement.addEventListener('pointermove', (event) => {
-        if (!pointerState.active) return;
-        const dx = event.clientX - pointerState.x;
-        const dy = event.clientY - pointerState.y;
-        pointerState.x = event.clientX;
-        pointerState.y = event.clientY;
-        orbit.yaw -= dx * 0.006;
-        orbit.pitch = THREE.MathUtils.clamp(orbit.pitch + dy * 0.0045, -0.05, 1.25);
-        updateCamera();
-      });
-
-      renderer.domElement.addEventListener('pointerup', (event) => {
-        pointerState.active = false;
-        renderer.domElement.releasePointerCapture(event.pointerId);
-      });
+      renderer.domElement.addEventListener('pointerdown', handlePointerDown);
+      renderer.domElement.addEventListener('pointermove', handlePointerMove);
+      renderer.domElement.addEventListener('pointerup', handlePointerEnd);
+      renderer.domElement.addEventListener('pointercancel', handlePointerEnd);
 
       renderer.domElement.addEventListener('wheel', (event) => {
         event.preventDefault();
-        orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * 0.003, 2.3, 8.5);
+        orbit.radius = clampOrbitRadius(orbit.radius + event.deltaY * 0.003);
         updateCamera();
       }, { passive: false });
 
@@ -1242,6 +1229,106 @@
           updateCamera();
         }
       });
+    }
+
+    function handlePointerDown(event) {
+      event.preventDefault();
+      pointerState.pointers.set(event.pointerId, getPointerPoint(event));
+      capturePointer(event.pointerId);
+
+      if (pointerState.pointers.size === 1) {
+        pointerState.rotatePointerId = event.pointerId;
+        pointerState.lastX = event.clientX;
+        pointerState.lastY = event.clientY;
+      } else if (pointerState.pointers.size === 2) {
+        startPinchGesture();
+      }
+    }
+
+    function handlePointerMove(event) {
+      if (!pointerState.pointers.has(event.pointerId)) return;
+      event.preventDefault();
+      pointerState.pointers.set(event.pointerId, getPointerPoint(event));
+
+      if (pointerState.pointers.size >= 2) {
+        const distance = getPinchDistance();
+        if (distance > 0 && pointerState.pinchStartDistance > 0) {
+          orbit.radius = clampOrbitRadius(
+            pointerState.pinchStartRadius * pointerState.pinchStartDistance / distance
+          );
+          updateCamera();
+        }
+        return;
+      }
+
+      if (pointerState.rotatePointerId !== event.pointerId) return;
+      const dx = event.clientX - pointerState.lastX;
+      const dy = event.clientY - pointerState.lastY;
+      pointerState.lastX = event.clientX;
+      pointerState.lastY = event.clientY;
+      orbit.yaw -= dx * 0.006;
+      orbit.pitch = THREE.MathUtils.clamp(orbit.pitch + dy * 0.0045, -0.05, 1.25);
+      updateCamera();
+    }
+
+    function handlePointerEnd(event) {
+      pointerState.pointers.delete(event.pointerId);
+      releasePointer(event.pointerId);
+
+      if (pointerState.pointers.size >= 2) {
+        startPinchGesture();
+        return;
+      }
+
+      pointerState.pinchStartDistance = 0;
+      if (pointerState.pointers.size === 1) {
+        const [entry] = pointerState.pointers.entries();
+        const [pointerId, point] = entry;
+        pointerState.rotatePointerId = pointerId;
+        pointerState.lastX = point.x;
+        pointerState.lastY = point.y;
+        return;
+      }
+
+      pointerState.rotatePointerId = null;
+    }
+
+    function getPointerPoint(event) {
+      return { x: event.clientX, y: event.clientY };
+    }
+
+    function startPinchGesture() {
+      pointerState.rotatePointerId = null;
+      pointerState.pinchStartDistance = getPinchDistance();
+      pointerState.pinchStartRadius = orbit.radius;
+    }
+
+    function getPinchDistance() {
+      const points = Array.from(pointerState.pointers.values());
+      if (points.length < 2) return 0;
+      return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+    }
+
+    function clampOrbitRadius(value) {
+      return THREE.MathUtils.clamp(value, ORBIT_RADIUS_MIN, ORBIT_RADIUS_MAX);
+    }
+
+    function capturePointer(pointerId) {
+      try {
+        renderer.domElement.setPointerCapture(pointerId);
+      } catch {
+        // Some browsers can drop capture during multi-touch transitions.
+      }
+    }
+
+    function releasePointer(pointerId) {
+      try {
+        if (renderer.domElement.hasPointerCapture?.(pointerId)) {
+          renderer.domElement.releasePointerCapture(pointerId);
+        }
+      } catch {
+        // Capture may already be gone after pointer cancellation.
+      }
     }
 
     function populateModelSelect() {
