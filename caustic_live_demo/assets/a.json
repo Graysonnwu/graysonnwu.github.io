@@ -1,0 +1,8 @@
+[
+  { "id": "p01", "label": "head", "file": "a01.dat", "type": "s", "pack": "g" },
+  { "id": "p02", "label": "einstein", "file": "a02.dat", "type": "s", "pack": "g" },
+  { "id": "p03", "label": "oiiai", "file": "a03.dat", "type": "s", "pack": "g" },
+  { "id": "p04", "label": "pixeluxe", "file": "a04.dat", "type": "s", "pack": "g" },
+  { "id": "p05", "label": "tom&jerry_cube", "file": "a05.dat", "type": "s", "pack": "g" },
+  { "id": "p06", "label": "wave", "file": "a06.dat", "type": "s", "pack": "g" }
+]
