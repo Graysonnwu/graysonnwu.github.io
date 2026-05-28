@@ -1,5 +1,5 @@
 [
-  { "id": "p01", "label": "head", "file": "a01.dat", "type": "s", "pack": "g" },
+  { "id": "p01", "label": "head", "file": "a01.flatmesh.gz", "type": "m", "pack": "g" },
   { "id": "p02", "label": "einstein", "file": "a02.dat", "type": "s", "pack": "g" },
   { "id": "p03", "label": "oiiai", "file": "a03.dat", "type": "s", "pack": "g" },
   { "id": "p04", "label": "pixeluxe", "file": "a04.dat", "type": "s", "pack": "g" },
