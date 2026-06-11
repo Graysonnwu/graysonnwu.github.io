@@ -71,86 +71,6 @@
       overflow: hidden;
     }
 
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      min-height: 50px;
-      padding: 0 2px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-
-    .brand-mark {
-      width: 38px;
-      height: 38px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(99, 217, 239, 0.42);
-      border-radius: 8px;
-      background: rgba(99, 217, 239, 0.08);
-      box-shadow: inset 0 0 22px rgba(99, 217, 239, 0.06);
-      flex: 0 0 auto;
-    }
-
-    .brand-mark svg {
-      width: 24px;
-      height: 24px;
-      color: var(--cyan);
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(18px, 2vw, 24px);
-      line-height: 1.12;
-      font-weight: 720;
-    }
-
-    .brand p {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.2;
-    }
-
-    .top-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .icon-button {
-      width: 38px;
-      height: 38px;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.045);
-      cursor: pointer;
-      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
-    }
-
-    .icon-button:hover {
-      border-color: var(--line-strong);
-      background: rgba(255, 255, 255, 0.075);
-      transform: translateY(-1px);
-    }
-
-    .icon-button svg {
-      width: 18px;
-      height: 18px;
-      stroke-width: 1.8;
-    }
-
     .shell {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 340px;
@@ -174,17 +94,6 @@
       grid-template-rows: auto minmax(0, 1fr) auto;
       overflow: hidden;
       min-height: 0;
-    }
-
-    .stage-toolbar {
-      min-height: 54px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 11px 14px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(9, 13, 16, 0.54);
     }
 
     .mode-switch {
@@ -257,33 +166,6 @@
 
     .parallel-icon::after {
       bottom: 4px;
-    }
-
-    .formula-strip {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      gap: 8px;
-      color: var(--muted);
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.2;
-    }
-
-    .formula-strip span {
-      padding: 7px 9px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.035);
-    }
-
-    .stage-tools {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      gap: 8px;
     }
 
     .scene-wrap {
@@ -389,13 +271,6 @@
       vector-effect: non-scaling-stroke;
     }
 
-    .hit-dot {
-      fill: #f6fbff;
-      stroke: rgba(8, 11, 13, 0.7);
-      stroke-width: 1.2;
-      vector-effect: non-scaling-stroke;
-    }
-
     .source-dot {
       fill: var(--amber);
       stroke: #fff5bd;
@@ -404,26 +279,12 @@
       filter: drop-shadow(0 0 12px rgba(255, 211, 92, 0.9));
     }
 
-    .source-halo {
-      fill: rgba(255, 211, 92, 0.14);
-      stroke: rgba(255, 211, 92, 0.3);
-      stroke-width: 1;
-      vector-effect: non-scaling-stroke;
-    }
-
     .handle {
       fill: rgba(237, 247, 251, 0.96);
       stroke: rgba(8, 11, 13, 0.82);
       stroke-width: 1.5;
       vector-effect: non-scaling-stroke;
       filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.45));
-    }
-
-    .handle-ring {
-      fill: rgba(99, 217, 239, 0.08);
-      stroke: rgba(99, 217, 239, 0.52);
-      stroke-width: 1.2;
-      vector-effect: non-scaling-stroke;
     }
 
     .dim-line {
@@ -465,6 +326,86 @@
       fill: var(--amber);
     }
 
+    .label-red {
+      fill: #ff2222;
+    }
+
+    .focal-marker-dot {
+      fill: #ff2222;
+      stroke: rgba(9, 12, 15, 0.92);
+      stroke-width: var(--scene-focal-dot-stroke, 2px);
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
+
+    .scene-label-lockable {
+      outline: none;
+    }
+
+    .scene-lock-label {
+      pointer-events: visiblePainted;
+    }
+
+    .scene-lock-control {
+      cursor: pointer;
+      opacity: 0;
+      outline: 0 solid transparent;
+      pointer-events: none;
+      transition: opacity 140ms ease;
+    }
+
+    .scene-label-lockable:hover .scene-lock-control,
+    .scene-label-lockable.is-hovered .scene-lock-control,
+    .scene-label-lockable:focus-within .scene-lock-control,
+    .scene-lock-control.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .scene-label-lockable:hover .scene-lock-control.disabled,
+    .scene-label-lockable.is-hovered .scene-lock-control.disabled {
+      opacity: 0.34;
+      pointer-events: none;
+    }
+
+    .scene-lock-control:focus,
+    .scene-lock-control:focus-visible {
+      outline: 0 solid transparent;
+    }
+
+    .scene-lock-control rect {
+      fill: rgba(7, 10, 12, 0.74);
+      stroke: rgba(255, 255, 255, 0.22);
+      stroke-width: 1.2;
+    }
+
+    .scene-lock-control path {
+      fill: none;
+      stroke: var(--text);
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .scene-lock-control:hover rect {
+      fill: rgba(255, 255, 255, 0.1);
+      stroke: rgba(255, 255, 255, 0.42);
+    }
+
+    .scene-lock-control:focus-visible rect {
+      fill: rgba(99, 217, 239, 0.1);
+      stroke: rgba(99, 217, 239, 0.5);
+    }
+
+    .scene-lock-control.active rect {
+      fill: rgba(99, 217, 239, 0.18);
+      stroke: rgba(99, 217, 239, 0.58);
+    }
+
+    .scene-lock-control.active path {
+      stroke: var(--cyan);
+    }
+
     .dim-label {
       fill: var(--text);
       font-family: var(--ui);
@@ -481,6 +422,10 @@
       fill: var(--amber);
     }
 
+    .dim-label.label-red {
+      fill: #ff2222;
+    }
+
     .ruler-text {
       fill: var(--subtle);
       font-family: var(--mono);
@@ -491,84 +436,11 @@
       stroke-linejoin: round;
     }
 
-    .metric-bar {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      border-top: 1px solid var(--line);
-      background: rgba(8, 12, 15, 0.62);
-    }
-
-    .metric {
-      min-width: 0;
-      padding: 13px 16px 14px;
-      border-right: 1px solid var(--line);
-    }
-
-    .metric:last-child {
-      border-right: 0;
-    }
-
-    .metric span {
-      display: block;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.2;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .metric strong {
-      display: block;
-      margin-top: 7px;
-      font-family: var(--mono);
-      font-size: clamp(14px, 1.25vw, 17px);
-      line-height: 1.18;
-      color: var(--text);
-      white-space: nowrap;
-    }
-
-    .metric strong.cyan {
-      color: var(--cyan);
-    }
-
-    .metric strong.amber {
-      color: var(--amber);
-    }
-
-    .metric strong.violet {
-      color: var(--violet);
-    }
-
     .panel {
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       min-height: 0;
-    }
-
-    .panel-section {
-      padding: 18px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .panel-section:last-child {
-      border-bottom: 0;
-    }
-
-    .section-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-
-    .section-head h2 {
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.2;
-      font-weight: 750;
     }
 
     .state-chip {
@@ -582,69 +454,6 @@
       white-space: nowrap;
     }
 
-    .control-stack {
-      display: grid;
-      gap: 15px;
-    }
-
-    .control {
-      display: grid;
-      gap: 8px;
-    }
-
-    .control label {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.2;
-    }
-
-    .number-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .unit-input {
-      position: relative;
-      min-width: 0;
-    }
-
-    .unit-input input[type="number"] {
-      width: 100%;
-      height: 40px;
-      color: var(--text);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(5, 8, 11, 0.48);
-      padding: 0 42px 0 12px;
-      outline: none;
-      font-family: var(--mono);
-      font-size: 15px;
-      transition: border-color 140ms ease, background 140ms ease;
-    }
-
-    .unit-input input[type="number"]:focus {
-      border-color: rgba(99, 217, 239, 0.72);
-      background: rgba(5, 8, 11, 0.68);
-    }
-
-    .unit-input input[type="number"]:disabled {
-      color: var(--subtle);
-      border-color: rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.025);
-    }
-
-    .unit-input span {
-      position: absolute;
-      right: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      font-size: 12px;
-      pointer-events: none;
-    }
-
     input[type="range"] {
       width: 100%;
       height: 18px;
@@ -656,132 +465,6 @@
     input[type="range"]:disabled {
       cursor: not-allowed;
       opacity: 0.42;
-    }
-
-    .stepper {
-      display: grid;
-      grid-template-columns: 34px 34px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .stepper button {
-      width: 34px;
-      height: 40px;
-      border: 0;
-      border-right: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
-      cursor: pointer;
-      font-size: 17px;
-      line-height: 1;
-    }
-
-    .stepper button:last-child {
-      border-right: 0;
-    }
-
-    .stepper button:hover {
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .stepper button:disabled {
-      color: var(--subtle);
-      cursor: not-allowed;
-      background: rgba(255, 255, 255, 0.025);
-    }
-
-    .switch-row {
-      min-height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .switch-row span {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .switch {
-      position: relative;
-      width: 48px;
-      height: 28px;
-      flex: 0 0 auto;
-    }
-
-    .switch input {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .switch i {
-      position: absolute;
-      inset: 0;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.07);
-      cursor: pointer;
-      transition: background 160ms ease, border-color 160ms ease;
-    }
-
-    .switch i::after {
-      content: "";
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      left: 3px;
-      top: 3px;
-      border-radius: 50%;
-      background: #dbe7ec;
-      transition: transform 160ms ease, background 160ms ease;
-    }
-
-    .switch input:checked + i {
-      border-color: rgba(99, 217, 239, 0.48);
-      background: rgba(99, 217, 239, 0.24);
-    }
-
-    .switch input:checked + i::after {
-      transform: translateX(20px);
-      background: var(--cyan);
-    }
-
-    .readout {
-      display: grid;
-      gap: 10px;
-      margin-top: 14px;
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
-    }
-
-    .readout-row {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .readout-row strong {
-      color: var(--text);
-      font-family: var(--mono);
-      font-size: 13px;
-    }
-
-    .note {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.55;
-      margin: 12px 0 0;
-      padding: 10px 11px;
-      border: 1px solid rgba(99, 217, 239, 0.16);
-      border-radius: 8px;
-      background: rgba(99, 217, 239, 0.055);
     }
 
     .sr-only {
@@ -818,32 +501,11 @@
         grid-template-columns: repeat(4, minmax(0, 1fr));
         overflow: hidden;
       }
-
-      .panel-section {
-        border-bottom: 0;
-        border-right: 1px solid var(--line);
-      }
-
-      .panel-section:last-child {
-        border-right: 0;
-      }
     }
 
     @media (max-width: 760px) {
       .app {
         padding: 12px;
-      }
-
-      .topbar,
-      .stage-toolbar {
-        align-items: stretch;
-        flex-direction: column;
-      }
-
-      .top-actions,
-      .stage-tools,
-      .formula-strip {
-        justify-content: flex-start;
       }
 
       .stage-card {
@@ -855,28 +517,8 @@
         min-height: 300px;
       }
 
-      .metric-bar,
       .panel {
         grid-template-columns: 1fr;
-      }
-
-      .metric,
-      .panel-section {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .metric:last-child,
-      .panel-section:last-child {
-        border-bottom: 0;
-      }
-
-      .metric {
-        padding: 12px 14px;
-      }
-
-      .metric strong {
-        font-size: 17px;
       }
     }
 
@@ -885,12 +527,6 @@
       inset: 0;
       display: block;
       padding: 0;
-    }
-
-    .topbar,
-    .stage-toolbar,
-    .metric-bar {
-      display: none;
     }
 
     .shell,
@@ -981,7 +617,7 @@
 
     .hud-head {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      grid-template-columns: minmax(0, 1fr) auto auto auto auto;
       align-items: center;
       gap: 8px 10px;
       min-height: 26px;
@@ -1030,9 +666,9 @@
 
     .control {
       display: grid;
-      grid-template-columns: 86px minmax(0, 1fr) 54px 56px;
+      grid-template-columns: 86px minmax(0, 1fr) 54px 28px 28px;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       width: 100%;
       min-width: 0;
       min-height: 26px;
@@ -1069,11 +705,6 @@
       grid-row: 3;
     }
 
-    .number-row,
-    .legacy-readout {
-      display: none;
-    }
-
     .control-name {
       min-width: 0;
       color: var(--muted);
@@ -1094,21 +725,33 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .lock-button {
-      min-width: 56px;
+    .control-icon-button {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 28px;
       height: 24px;
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.045);
       color: var(--muted);
       cursor: pointer;
-      font-family: var(--mono);
-      font-size: 11px;
       line-height: 1;
+      transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+    }
+
+    .control-icon-button svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .lock-placeholder {
-      width: 56px;
+      width: 28px;
       height: 24px;
     }
 
@@ -1118,7 +761,8 @@
       color: var(--cyan);
     }
 
-    .lock-button:disabled {
+    .lock-button:disabled,
+    .reset-control-button:disabled {
       opacity: 0.36;
       cursor: not-allowed;
     }
@@ -1164,9 +808,17 @@
     }
 
     .view-controls button:hover,
-    .lock-button:hover {
+    .control-icon-button:hover {
       border-color: var(--line-strong);
       color: var(--text);
+    }
+
+    .control-icon-button:hover {
+      background: rgba(255, 255, 255, 0.075);
+    }
+
+    .hud-reset-button {
+      align-self: end;
     }
 
     @media (max-width: 760px) {
@@ -1179,7 +831,7 @@
       }
 
       .hud-head {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         gap: 8px;
       }
 
@@ -1213,69 +865,20 @@
       }
 
       .control {
-        grid-template-columns: 72px minmax(0, 1fr) 46px 48px;
+        grid-template-columns: 72px minmax(0, 1fr) 46px 28px 28px;
         grid-column: auto !important;
         grid-row: auto !important;
         gap: 6px;
-      }
-
-      .lock-button {
-        min-width: 48px;
       }
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="8.5" stroke="currentColor"></circle>
-            <path d="M12 2.8v18.4M2.8 12h18.4M7.4 7.4l9.2 9.2M16.6 7.4l-9.2 9.2" stroke="currentColor" stroke-linecap="round"></path>
-            <circle cx="12" cy="12" r="2.4" stroke="currentColor"></circle>
-          </svg>
-        </div>
-        <div>
-          <h1>焦散透镜焦距与放大率计算器</h1>
-          <p>墙面 <span aria-hidden="true">&lt;---</span> 透镜 <span aria-hidden="true">&lt;---</span> 光源</p>
-        </div>
-      </div>
-      <div class="top-actions">
-        <button class="icon-button" id="resetButton" type="button" title="恢复默认值" aria-label="恢复默认值">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M3 12a9 9 0 1 0 3-6.7"></path>
-            <path d="M3 4.5v5h5"></path>
-          </svg>
-        </button>
-      </div>
-    </header>
-
     <section class="shell">
       <div class="stage-card">
-        <div class="stage-toolbar">
-          <div class="mode-switch" role="tablist" aria-label="光源模式">
-            <button id="pointMode" class="active" type="button" role="tab" aria-selected="true">
-              <span class="dot-icon" aria-hidden="true"></span>
-              点光源
-            </button>
-            <button id="parallelMode" type="button" role="tab" aria-selected="false">
-              <span class="parallel-icon" aria-hidden="true"></span>
-              平行光
-            </button>
-          </div>
-          <div class="stage-tools">
-            <div class="formula-strip" aria-label="计算公式">
-              <span id="formulaF">单位制：1/f = 1/u + 1/v</span>
-              <span id="formulaM">M = (u + v) / v</span>
-            </div>
-          </div>
-        </div>
-
         <div class="scene-wrap" id="sceneWrap">
-          <svg id="scene" class="scene-svg" viewBox="-11.2 -6.2 22.4 12.4" preserveAspectRatio="xMidYMid meet" aria-labelledby="sceneTitle sceneDesc">
-            <title id="sceneTitle">焦散透镜二维示意图</title>
-            <desc id="sceneDesc">可以拖动墙面和点光源位置，辅助线会实时更新投影范围。</desc>
+          <svg id="scene" class="scene-svg" viewBox="-11.2 -6.2 22.4 12.4" preserveAspectRatio="xMidYMid meet" aria-label="焦散透镜二维示意图">
             <defs>
               <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
                 <path d="M0 0 L10 5 L0 10 Z" fill="rgba(237, 247, 251, 0.72)"></path>
@@ -1296,25 +899,29 @@
               <line id="wallFull" class="wall-line" x1="-60" y1="-58" x2="-60" y2="58"></line>
               <line id="projectionLine" class="projection-line" x1="-60" y1="-10" x2="-60" y2="10"></line>
               <line id="projectionDim" class="projection-dim" x1="-67" y1="-10" x2="-67" y2="10"></line>
-              <circle id="wallHandleRing" class="handle-ring" cx="-60" cy="0" r="7.2"></circle>
               <circle id="wallHandle" class="handle" cx="-60" cy="0" r="3.2"></circle>
               <text id="wallLabel" class="label" x="-58" y="-48">墙面</text>
               <text id="projectionLabel" class="label label-amber" x="-88" y="-12">投影范围</text>
-              <text id="projectionSizeLabel" class="dim-label projection-size-label" x="-98" y="2">投影 2.0x = 20.0 cm</text>
+            </g>
+
+            <g id="projectionSizeLabelGroup" class="scene-label-lockable">
+              <text id="projectionSizeLabel" class="dim-label projection-size-label scene-lock-label" x="-98" y="2">投影 2.0x = 20.0 cm</text>
+              <g id="projectionSizeLock" class="scene-lock-control" data-scene-lock="m" role="button" tabindex="0" aria-pressed="false" aria-label="固定投影尺寸">
+                <rect x="0" y="0" width="24" height="24" rx="7"></rect>
+                <path d="M12 17v5"></path>
+                <path d="M5 17h14"></path>
+                <path d="M17 17v-6.5L19 9V7H5v2l2 1.5V17"></path>
+              </g>
             </g>
 
             <g id="lensGroup">
               <path id="lensBody" class="lens-body" d=""></path>
               <line id="lensEdge" class="lens-edge" x1="0" y1="-0.5" x2="0" y2="0.5"></line>
-              <circle id="lensTopDot" class="hit-dot" cx="0" cy="-0.5" r="1.7"></circle>
-              <circle id="lensBottomDot" class="hit-dot" cx="0" cy="0.5" r="1.7"></circle>
               <text id="lensLabel" class="label label-cyan" x="3.2" y="-18">透镜 1.0x = 10.0 cm</text>
             </g>
 
             <g id="sourceGroup" class="draggable" data-drag="source" tabindex="0" role="slider" aria-label="点光源距离">
-              <circle id="sourceHalo" class="source-halo" cx="60" cy="0" r="8"></circle>
               <circle id="sourceDot" class="source-dot" cx="60" cy="0" r="3.6"></circle>
-              <circle id="sourceHandleRing" class="handle-ring" cx="60" cy="0" r="9.2"></circle>
               <text id="sourceLabel" class="label label-amber" x="65" y="-8">点光源</text>
             </g>
 
@@ -1322,6 +929,18 @@
               <text class="label label-amber" x="105" y="-28">平行光</text>
               <path d="M122 -18 h29 M122 0 h29 M122 18 h29" class="ray-parallel"></path>
               <path d="M146 -22 l7 4 -7 4 M146 -4 l7 4 -7 4 M146 14 l7 4 -7 4" fill="none" class="ray-parallel"></path>
+            </g>
+
+            <g id="focalMarkersLayer" aria-hidden="true"></g>
+
+            <g id="focalLabelGroup" class="scene-label-lockable">
+              <text id="focalLabel" class="dim-label label-red scene-lock-label" x="3.2" y="18">焦距 f 3.0x</text>
+              <g id="focalLock" class="scene-lock-control" data-scene-lock="f" role="button" tabindex="0" aria-pressed="false" aria-label="固定焦距 f">
+                <rect x="0" y="0" width="24" height="24" rx="7"></rect>
+                <path d="M12 17v5"></path>
+                <path d="M5 17h14"></path>
+                <path d="M17 17v-6.5L19 9V7H5v2l2 1.5V17"></path>
+              </g>
             </g>
 
             <g id="dimensionLayer">
@@ -1338,28 +957,6 @@
           </svg>
         </div>
 
-        <div class="metric-bar" aria-label="实时计算结果">
-          <div class="metric">
-            <span>u 透镜到墙面</span>
-            <strong id="metricU" class="cyan">6.0x = 60.0 cm</strong>
-          </div>
-          <div class="metric">
-            <span>v 透镜到光源</span>
-            <strong id="metricV" class="cyan">6.0x = 60.0 cm</strong>
-          </div>
-          <div class="metric">
-            <span>f 焦距</span>
-            <strong id="metricF" class="amber">3.0x = 30.0 cm</strong>
-          </div>
-          <div class="metric">
-            <span>M 放大率</span>
-            <strong id="metricM" class="violet">2.000</strong>
-          </div>
-          <div class="metric">
-            <span>投影范围</span>
-            <strong id="metricProjection">2.0x = 20.0 cm</strong>
-          </div>
-        </div>
       </div>
 
       <aside class="panel" id="hudPanel" aria-label="参数控制">
@@ -1388,6 +985,12 @@
             </button>
           </div>
           <span class="state-chip" id="focusChip">无固定</span>
+          <button class="control-icon-button hud-reset-button" id="resetButton" type="button" title="恢复默认值" aria-label="恢复默认值">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+              <path d="M3 4.5v5h5"></path>
+            </svg>
+          </button>
           <span class="state-chip sr-only" id="modeChip">点光源</span>
         </div>
 
@@ -1398,6 +1001,12 @@
               <input id="lensRange" type="range" min="1" max="20" step="0.5" value="10" aria-label="透镜物理尺寸滑杆">
               <strong class="control-value" id="lensValue">10.0 cm</strong>
               <span class="lock-placeholder" aria-hidden="true"></span>
+              <button class="control-icon-button reset-control-button" id="resetLens" type="button" data-reset-control="lens" aria-label="重置单位尺寸" title="重置单位尺寸">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                  <path d="M3 4.5v5h5"></path>
+                </svg>
+              </button>
               <input id="lensInput" class="sr-only" type="number" min="1" max="20" step="0.5" value="10">
             </div>
 
@@ -1405,7 +1014,19 @@
               <label class="control-name" for="uRange">投影距离 u</label>
               <input id="uRange" type="range" min="0.5" max="10" step="0.1" value="6" aria-label="u 距离滑杆">
               <strong class="control-value" id="uValue">6.0x</strong>
-              <button class="lock-button" id="lockU" type="button" data-lock="u" aria-pressed="false">固定</button>
+              <button class="control-icon-button lock-button" id="lockU" type="button" data-lock="u" aria-pressed="false" aria-label="固定投影距离 u" title="固定投影距离 u">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 17v5"></path>
+                  <path d="M5 17h14"></path>
+                  <path d="M17 17v-6.5L19 9V7H5v2l2 1.5V17"></path>
+                </svg>
+              </button>
+              <button class="control-icon-button reset-control-button" id="resetU" type="button" data-reset-control="u" aria-label="重置投影距离 u" title="重置投影距离 u">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                  <path d="M3 4.5v5h5"></path>
+                </svg>
+              </button>
               <input id="uInput" class="sr-only" type="number" min="0.5" max="10" step="0.1" value="6">
             </div>
 
@@ -1413,7 +1034,19 @@
               <label class="control-name" for="vRange">光源距离 v</label>
               <input id="vRange" type="range" min="0.5" max="10" step="0.1" value="6" aria-label="v 距离滑杆">
               <strong class="control-value" id="vValue">6.0x</strong>
-              <button class="lock-button" id="lockV" type="button" data-lock="v" aria-pressed="false">固定</button>
+              <button class="control-icon-button lock-button" id="lockV" type="button" data-lock="v" aria-pressed="false" aria-label="固定光源距离 v" title="固定光源距离 v">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 17v5"></path>
+                  <path d="M5 17h14"></path>
+                  <path d="M17 17v-6.5L19 9V7H5v2l2 1.5V17"></path>
+                </svg>
+              </button>
+              <button class="control-icon-button reset-control-button" id="resetV" type="button" data-reset-control="v" aria-label="重置光源距离 v" title="重置光源距离 v">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                  <path d="M3 4.5v5h5"></path>
+                </svg>
+              </button>
               <input id="vInput" class="sr-only" type="number" min="0.5" max="10" step="0.1" value="6">
             </div>
 
@@ -1421,7 +1054,19 @@
               <label class="control-name" for="focalRange">焦距 f</label>
               <input id="focalRange" type="range" min="0.5" max="5" step="0.1" value="3" aria-label="固定焦距滑杆">
               <strong class="control-value" id="fValue">3.0x</strong>
-              <button class="lock-button" id="lockF" type="button" data-lock="f" aria-pressed="false">固定</button>
+              <button class="control-icon-button lock-button" id="lockF" type="button" data-lock="f" aria-pressed="false" aria-label="固定焦距 f" title="固定焦距 f">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 17v5"></path>
+                  <path d="M5 17h14"></path>
+                  <path d="M17 17v-6.5L19 9V7H5v2l2 1.5V17"></path>
+                </svg>
+              </button>
+              <button class="control-icon-button reset-control-button" id="resetF" type="button" data-reset-control="f" aria-label="重置焦距 f" title="重置焦距 f">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                  <path d="M3 4.5v5h5"></path>
+                </svg>
+              </button>
               <input id="focalInput" class="sr-only" type="number" min="0.5" max="5" step="0.1" value="3">
             </div>
 
@@ -1429,17 +1074,21 @@
               <label class="control-name" for="mRange">放大率 M</label>
               <input id="mRange" type="range" min="1.05" max="21" step="0.05" value="2" aria-label="M 放大率滑杆">
               <strong class="control-value" id="mValue">2.0x</strong>
-              <button class="lock-button" id="lockM" type="button" data-lock="m" aria-pressed="false">固定</button>
+              <button class="control-icon-button lock-button" id="lockM" type="button" data-lock="m" aria-pressed="false" aria-label="固定放大率 M" title="固定放大率 M">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 17v5"></path>
+                  <path d="M5 17h14"></path>
+                  <path d="M17 17v-6.5L19 9V7H5v2l2 1.5V17"></path>
+                </svg>
+              </button>
+              <button class="control-icon-button reset-control-button" id="resetM" type="button" data-reset-control="m" aria-label="重置放大率 M" title="重置放大率 M">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                  <path d="M3 4.5v5h5"></path>
+                </svg>
+              </button>
             </div>
           </div>
-        </div>
-        <div class="legacy-readout" hidden>
-          <span id="unitChip">1.0x = 10.0 cm</span>
-          <span id="projectionChip">2.0x</span>
-          <strong id="readoutF">3.0x = 30.0 cm</strong>
-          <strong id="readoutM">2.000 x</strong>
-          <strong id="readoutHalf">1.0x = 10.0 cm</strong>
-          <p id="modeNote">场景使用透镜尺寸作为单位，透镜在画布中固定为 1。改变物理尺寸只换算标注，不改变几何位置。</p>
         </div>
       </aside>
     </section>
@@ -1460,7 +1109,7 @@
       epsilon: 0.05
     };
 
-    const state = {
+    const DEFAULTS = Object.freeze({
       mode: "point",
       u: 6,
       v: 6,
@@ -1468,7 +1117,18 @@
       fixedF: 3,
       fixedM: 2,
       lock: null,
-      zoom: 1,
+      zoom: 1
+    });
+
+    const state = {
+      mode: DEFAULTS.mode,
+      u: DEFAULTS.u,
+      v: DEFAULTS.v,
+      lens: DEFAULTS.lens,
+      fixedF: DEFAULTS.fixedF,
+      fixedM: DEFAULTS.fixedM,
+      lock: DEFAULTS.lock,
+      zoom: DEFAULTS.zoom,
       activeDrag: null
     };
 
@@ -1481,6 +1141,14 @@
       maxZoom: 2.24
     };
 
+    const SCENE_LABEL = Object.freeze({
+      lineGapPx: 13,
+      lockSizePx: 21,
+      lockGapPx: 5,
+      hoverHideDelayMs: 150,
+      focalDotRadiusPx: 1.9
+    });
+
     let applyingUrlState = false;
     let urlSyncQueued = false;
 
@@ -1492,10 +1160,6 @@
       gridLayer: $("gridLayer"),
       rayLayer: $("rayLayer"),
       parallelRayLayer: $("parallelRayLayer"),
-      pointMode: $("pointMode"),
-      parallelMode: $("parallelMode"),
-      formulaF: $("formulaF"),
-      formulaM: $("formulaM"),
       zoomOutButton: $("zoomOutButton"),
       zoomInButton: $("zoomInButton"),
       zoomFitButton: $("zoomFitButton"),
@@ -1506,8 +1170,6 @@
       hudSummary: $("hudSummary"),
       modeChip: $("modeChip"),
       focusChip: $("focusChip"),
-      unitChip: $("unitChip"),
-      projectionChip: $("projectionChip"),
       uInput: $("uInput"),
       uRange: $("uRange"),
       vInput: $("vInput"),
@@ -1523,6 +1185,11 @@
       lockV: $("lockV"),
       lockF: $("lockF"),
       lockM: $("lockM"),
+      resetLens: $("resetLens"),
+      resetU: $("resetU"),
+      resetV: $("resetV"),
+      resetF: $("resetF"),
+      resetM: $("resetM"),
       lensValue: $("lensValue"),
       uValue: $("uValue"),
       vValue: $("vValue"),
@@ -1532,23 +1199,24 @@
       wallFull: $("wallFull"),
       projectionLine: $("projectionLine"),
       projectionDim: $("projectionDim"),
-      wallHandleRing: $("wallHandleRing"),
       wallHandle: $("wallHandle"),
       wallLabel: $("wallLabel"),
       projectionLabel: $("projectionLabel"),
+      projectionSizeLabelGroup: $("projectionSizeLabelGroup"),
       projectionSizeLabel: $("projectionSizeLabel"),
+      projectionSizeLock: $("projectionSizeLock"),
       lensGroup: $("lensGroup"),
       lensBody: $("lensBody"),
       lensEdge: $("lensEdge"),
-      lensTopDot: $("lensTopDot"),
-      lensBottomDot: $("lensBottomDot"),
       lensLabel: $("lensLabel"),
       sourceGroup: $("sourceGroup"),
-      sourceHalo: $("sourceHalo"),
       sourceDot: $("sourceDot"),
-      sourceHandleRing: $("sourceHandleRing"),
       sourceLabel: $("sourceLabel"),
       parallelSourceGroup: $("parallelSourceGroup"),
+      focalMarkersLayer: $("focalMarkersLayer"),
+      focalLabelGroup: $("focalLabelGroup"),
+      focalLabel: $("focalLabel"),
+      focalLock: $("focalLock"),
       axisLine: $("axisLine"),
       axisLabel: $("axisLabel"),
       uDim: $("uDim"),
@@ -1558,16 +1226,7 @@
       vDim: $("vDim"),
       vTickA: $("vTickA"),
       vTickB: $("vTickB"),
-      vLabel: $("vLabel"),
-      metricU: $("metricU"),
-      metricV: $("metricV"),
-      metricF: $("metricF"),
-      metricM: $("metricM"),
-      metricProjection: $("metricProjection"),
-      readoutF: $("readoutF"),
-      readoutM: $("readoutM"),
-      readoutHalf: $("readoutHalf"),
-      modeNote: $("modeNote")
+      vLabel: $("vLabel")
     };
 
     const fmt = (value, digits = 1) => Number(value).toFixed(digits);
@@ -1607,6 +1266,20 @@
       for (const [key, value] of Object.entries(attrs)) {
         el.setAttribute(key, value);
       }
+    }
+
+    function hasClass(el, className) {
+      return (` ${el.getAttribute("class") || ""} `).includes(` ${className} `);
+    }
+
+    function setClass(el, className, enabled) {
+      const classes = new Set((el.getAttribute("class") || "").split(/\s+/).filter(Boolean));
+      if (enabled) {
+        classes.add(className);
+      } else {
+        classes.delete(className);
+      }
+      el.setAttribute("class", [...classes].join(" "));
     }
 
     function makeSvg(tag, attrs = {}) {
@@ -1699,6 +1372,7 @@
       els.scene.style.setProperty("--scene-dim-stroke", `${screenUnit(compact ? 3.8 : 3.2)}px`);
       els.scene.style.setProperty("--scene-ruler-size", `${screenUnit(compact ? 8 : 9)}px`);
       els.scene.style.setProperty("--scene-ruler-stroke", `${screenUnit(compact ? 3 : 2.6)}px`);
+      els.scene.style.setProperty("--scene-focal-dot-stroke", `${screenUnit(compact ? 3.2 : 2.8)}px`);
       els.scene.setAttribute("viewBox", `${-view.halfX} ${-view.halfY} ${view.halfX * 2} ${view.halfY * 2}`);
       buildGrid();
       if (shouldRender) render();
@@ -2156,6 +1830,105 @@
       els.parallelRayLayer.replaceChildren(guides);
     }
 
+    function estimateSvgTextWidthPx(text) {
+      let width = 0;
+      for (const char of text) {
+        const code = char.codePointAt(0);
+        if (char === " ") width += 4;
+        else if (code >= 0x2e80) width += 12;
+        else if (/[0-9]/.test(char)) width += 7.2;
+        else if (/[A-Z]/.test(char)) width += 8;
+        else width += 6.2;
+      }
+      return width;
+    }
+
+    function estimateLabelBox(lines, x, y, anchor) {
+      const width = screenUnit(Math.max(...lines.map(estimateSvgTextWidthPx)));
+      const top = y - screenUnit(12);
+      const bottom = y + screenUnit((lines.length - 1) * SCENE_LABEL.lineGapPx + 5);
+      let left = x;
+      if (anchor === "end") left = x - width;
+      if (anchor === "middle") left = x - width / 2;
+      return {
+        left,
+        right: left + width,
+        top,
+        bottom
+      };
+    }
+
+    function setSceneLockControl(control, x, y, lockName, label, disabled = false) {
+      const size = screenUnit(SCENE_LABEL.lockSizePx);
+      const active = state.lock === lockName;
+      setClass(control, "active", active);
+      setClass(control, "disabled", disabled);
+      control.setAttribute("aria-pressed", String(active));
+      control.setAttribute("aria-disabled", String(disabled));
+      control.setAttribute("aria-label", `${active ? "取消固定" : "固定"}${label}`);
+      control.setAttribute("title", `${active ? "取消固定" : "固定"}${label}`);
+      control.setAttribute("tabindex", disabled ? "-1" : "0");
+      control.setAttribute("transform", `translate(${x - size / 2} ${y - size / 2}) scale(${size / 24})`);
+      return {
+        left: x - size / 2,
+        right: x + size / 2,
+        top: y - size / 2,
+        bottom: y + size / 2
+      };
+    }
+
+    function layoutLockableSceneLabel(options) {
+      const {
+        text,
+        lock,
+        lines,
+        x,
+        y,
+        anchor = "start",
+        lockSide = "right",
+        lockName,
+        lockLabel,
+        disabled = false
+      } = options;
+      setAttr(text, { "text-anchor": anchor });
+      setSvgLines(text, lines, x, y, SCENE_LABEL.lineGapPx);
+      const labelBox = estimateLabelBox(lines, x, y, anchor);
+      const lockSize = screenUnit(SCENE_LABEL.lockSizePx);
+      const lockGap = screenUnit(SCENE_LABEL.lockGapPx);
+      const lockX = lockSide === "left"
+        ? labelBox.left - lockGap - lockSize / 2
+        : labelBox.right + lockGap + lockSize / 2;
+      const lockY = labelBox.top + (labelBox.bottom - labelBox.top) / 2;
+      setSceneLockControl(lock, lockX, lockY, lockName, lockLabel, disabled);
+    }
+
+    function renderFocalMarkers(f, bottomLens) {
+      const fragment = document.createDocumentFragment();
+      for (const x of [-2 * f, -f, f, 2 * f]) {
+        fragment.appendChild(makeSvg("circle", {
+          class: "focal-marker-dot",
+          cx: x,
+          cy: 0,
+          r: screenUnit(SCENE_LABEL.focalDotRadiusPx)
+        }));
+      }
+      els.focalMarkersLayer.replaceChildren(fragment);
+
+      const labelX = screenUnit(11);
+      const labelY = bottomLens + screenUnit(16);
+      layoutLockableSceneLabel({
+        text: els.focalLabel,
+        lock: els.focalLock,
+        lines: ["焦距 f", unit(f)],
+        x: labelX,
+        y: labelY,
+        anchor: "start",
+        lockSide: "right",
+        lockName: "f",
+        lockLabel: "焦距 f"
+      });
+    }
+
     function render() {
       const u = state.u;
       const v = state.v;
@@ -2186,12 +1959,15 @@
         "Z"
       ].join(" ");
       const projectionDimX = wallX - screenUnit(12);
-      const projectionLabelX = wallX - minX > screenUnit(100)
-        ? wallX - screenUnit(16)
-        : wallX + screenUnit(80);
+      const projectionLabelGap = screenUnit(12);
+      const projectionLabelOnLeft = wallX - minX > screenUnit(118);
+      const projectionLabelX = projectionLabelOnLeft
+        ? wallX - projectionLabelGap
+        : wallX + projectionLabelGap;
       const projectionSizeY = Math.max(topWall - screenUnit(18), wallTop + screenUnit(20));
       const dimY = clamp(topWall - screenUnit(30), minY + edgePad + screenUnit(18), maxY - edgePad - screenUnit(12));
       const dimY2 = dimY;
+      const dimLabelY = dimY - screenUnit(30);
       const tick = screenUnit(10);
 
       setAttr(els.axisLine, { x1: minX + screenUnit(8), x2: maxX - screenUnit(8) });
@@ -2199,22 +1975,28 @@
       setAttr(els.wallFull, { x1: wallX, x2: wallX, y1: wallTop, y2: wallBottom });
       setAttr(els.projectionLine, { x1: wallX, x2: wallX, y1: topWall, y2: bottomWall });
       setAttr(els.projectionDim, { x1: projectionDimX, x2: projectionDimX, y1: topWall, y2: bottomWall });
-      setAttr(els.wallHandleRing, { cx: wallX, cy: 0, r: screenUnit(13) });
       setAttr(els.wallHandle, { cx: wallX, cy: 0, r: screenUnit(5) });
       els.wallLabel.textContent = "";
       els.projectionLabel.textContent = "";
-      setAttr(els.projectionSizeLabel, { "text-anchor": wallX - minX > screenUnit(100) ? "end" : "start" });
-      setSvgLines(els.projectionSizeLabel, ["投影尺寸", cmAndUnit(projection)], projectionLabelX, projectionSizeY, 13);
+      layoutLockableSceneLabel({
+        text: els.projectionSizeLabel,
+        lock: els.projectionSizeLock,
+        lines: ["投影尺寸", cmAndUnit(projection)],
+        x: projectionLabelX,
+        y: projectionSizeY,
+        anchor: projectionLabelOnLeft ? "end" : "start",
+        lockSide: projectionLabelOnLeft ? "left" : "right",
+        lockName: "m",
+        lockLabel: "投影尺寸",
+        disabled: state.mode !== "point"
+      });
 
       setAttr(els.lensBody, { d: lensPath });
       setAttr(els.lensEdge, { x1: 0, y1: topLens, x2: 0, y2: bottomLens });
-      setAttr(els.lensTopDot, { cx: 0, cy: topLens, r: screenUnit(3.6) });
-      setAttr(els.lensBottomDot, { cx: 0, cy: bottomLens, r: screenUnit(3.6) });
       setSvgLines(els.lensLabel, ["透镜尺寸", `${cm(lensPhysical)} (${unit(lensUnit)})`], screenUnit(11), topLens - screenUnit(16), 13);
+      renderFocalMarkers(f, bottomLens);
 
-      setAttr(els.sourceHalo, { cx: sourceX, cy: 0, r: screenUnit(15) });
       setAttr(els.sourceDot, { cx: sourceX, cy: 0, r: screenUnit(6.5) });
-      setAttr(els.sourceHandleRing, { cx: sourceX, cy: 0, r: screenUnit(17) });
       els.sourceLabel.textContent = "";
 
       drawRays(wallX, topLens, bottomLens, topWall, bottomWall);
@@ -2228,7 +2010,7 @@
       setAttr(els.uTickA, { x1: wallX, x2: wallX, y1: dimY - tick, y2: dimY + tick });
       setAttr(els.uTickB, { x1: 0, x2: 0, y1: dimY - tick, y2: dimY + tick });
       setAttr(els.uLabel, { "text-anchor": "middle" });
-      setSvgLines(els.uLabel, ["投影距离 u", cmAndUnit(u)], wallX / 2, dimY - screenUnit(2), 14);
+      setSvgLines(els.uLabel, ["投影距离 u", cmAndUnit(u)], wallX / 2, dimLabelY, 13);
 
       const vDimEnd = sourceVisible ? sourceX : maxX - screenUnit(34);
       setAttr(els.vDim, { x1: 0, y1: dimY2, x2: vDimEnd, y2: dimY2 });
@@ -2239,20 +2021,10 @@
         els.vLabel,
         sourceVisible ? ["光源距离 v", cmAndUnit(v)] : ["光源距离 v", "∞"],
         vDimEnd / 2,
-        dimY2 - screenUnit(2),
-        14
+        dimLabelY,
+        13
       );
 
-      els.metricU.textContent = unitAndCm(u);
-      els.metricV.textContent = sourceVisible ? unitAndCm(v) : "∞";
-      els.metricF.textContent = unitAndCm(f);
-      els.metricM.textContent = fmt(mag, 3);
-      els.metricProjection.textContent = unitAndCm(projection);
-      els.readoutF.textContent = unitAndCm(f);
-      els.readoutM.textContent = `${fmt(mag, 3)} x`;
-      els.readoutHalf.textContent = unitAndCm(projection / 2);
-      els.projectionChip.textContent = unit(projection);
-      els.unitChip.textContent = `${unit(lensUnit)} = ${cm(lensPhysical)}`;
       els.lensValue.textContent = cm(lensPhysical);
       els.uValue.textContent = unit(u);
       els.vValue.textContent = sourceVisible ? unit(v) : "∞";
@@ -2282,35 +2054,33 @@
       els.vRange.disabled = state.mode === "parallel" || state.lock === "v";
       els.focalRange.disabled = state.lock === "f";
       els.mRange.disabled = state.mode === "parallel" || state.lock === "m";
-      document.querySelectorAll('[data-step="v"]').forEach((button) => {
-        button.disabled = state.mode === "parallel" || state.lock === "v";
-      });
 
-      for (const button of [els.pointMode, els.hudPointMode]) {
-        button.classList.toggle("active", state.mode === "point");
-        button.setAttribute("aria-selected", String(state.mode === "point"));
-      }
-      for (const button of [els.parallelMode, els.hudParallelMode]) {
-        button.classList.toggle("active", state.mode === "parallel");
-        button.setAttribute("aria-selected", String(state.mode === "parallel"));
-      }
+      els.hudPointMode.classList.toggle("active", state.mode === "point");
+      els.hudPointMode.setAttribute("aria-selected", String(state.mode === "point"));
+      els.hudParallelMode.classList.toggle("active", state.mode === "parallel");
+      els.hudParallelMode.setAttribute("aria-selected", String(state.mode === "parallel"));
 
       const lockLabels = { u: "固定 u", v: "固定 v", f: "固定 f", m: "固定 M" };
       els.focusChip.textContent = state.lock ? lockLabels[state.lock] : "无固定";
+      const lockButtonLabels = {
+        u: "投影距离 u",
+        v: "光源距离 v",
+        f: "焦距 f",
+        m: "放大率 M"
+      };
       for (const [key, button] of Object.entries({ u: els.lockU, v: els.lockV, f: els.lockF, m: els.lockM })) {
         const active = state.lock === key;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", String(active));
-        button.textContent = active ? "已固定" : "固定";
+        button.setAttribute("aria-label", `${active ? "取消固定" : "固定"}${lockButtonLabels[key]}`);
+        button.title = `${active ? "取消固定" : "固定"}${lockButtonLabels[key]}`;
         button.disabled = state.mode === "parallel" && (key === "v" || key === "m");
+      }
+      for (const [key, button] of Object.entries({ v: els.resetV, m: els.resetM })) {
+        button.disabled = state.mode === "parallel";
       }
 
       els.modeChip.textContent = state.mode === "point" ? "点光源" : "平行光";
-      els.formulaF.textContent = state.mode === "point" ? "单位制：1/f = 1/u + 1/v" : "平行光：f = u";
-      els.formulaM.textContent = state.mode === "point" ? "M = (u + v) / v" : "M = 1";
-      els.modeNote.textContent = state.mode === "point"
-        ? "场景使用透镜尺寸作为单位，透镜在画布中固定为 1。改变物理尺寸只换算标注，不改变几何位置。"
-        : "平行光等效为光源在无限远处，投影范围保持为 1 个单位，焦距等于透镜到墙面的单位距离。";
 
       els.wallGroup.setAttribute("aria-valuemin", LIMITS.uMin);
       els.wallGroup.setAttribute("aria-valuemax", LIMITS.uMax);
@@ -2338,7 +2108,48 @@
       range.addEventListener("input", () => setter(Number(range.value)));
     }
 
+    const sceneLabelHoverTimers = new WeakMap();
+
+    function setSceneLabelHovered(group, hovered) {
+      const timer = sceneLabelHoverTimers.get(group);
+      if (timer) {
+        window.clearTimeout(timer);
+        sceneLabelHoverTimers.delete(group);
+      }
+      if (hovered) {
+        setClass(group, "is-hovered", true);
+        return;
+      }
+      sceneLabelHoverTimers.set(group, window.setTimeout(() => {
+        setClass(group, "is-hovered", false);
+        sceneLabelHoverTimers.delete(group);
+      }, SCENE_LABEL.hoverHideDelayMs));
+    }
+
+    function bindSceneLabelHover(group) {
+      for (const target of group.querySelectorAll(".scene-lock-label, .scene-lock-control")) {
+        target.addEventListener("pointerenter", () => setSceneLabelHovered(group, true));
+        target.addEventListener("pointerleave", () => setSceneLabelHovered(group, false));
+      }
+    }
+
+    function bindSceneLockButton(button) {
+      button.addEventListener("pointerdown", (event) => event.stopPropagation());
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (hasClass(button, "disabled")) return;
+        setLock(button.dataset.sceneLock);
+      });
+      button.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        if (hasClass(button, "disabled")) return;
+        setLock(button.dataset.sceneLock);
+      });
+    }
+
     function onPointerDown(event) {
+      if (event.target.closest(".scene-lock-control")) return;
       const target = event.target.closest("[data-drag]");
       if (!target) return;
       const dragType = target.dataset.drag;
@@ -2369,22 +2180,79 @@
       els.sceneWrap.classList.remove("dragging");
     }
 
-    function nudge(type, delta) {
-      if (type === "u") setU(state.u + delta);
-      if (type === "v") setV(state.v + delta);
-      if (type === "lens") setLens(state.lens + delta);
-      if (type === "focal") setF(currentFocal() + delta);
+    function commitDirectChange() {
+      syncDerived();
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function resetControl(control) {
+      if (control === "lens") {
+        setLens(DEFAULTS.lens);
+        return;
+      }
+
+      if (control === "u") {
+        if (state.lock === "u") {
+          state.u = DEFAULTS.u;
+          commitDirectChange();
+          return;
+        }
+        setU(DEFAULTS.u);
+        return;
+      }
+
+      if (control === "v") {
+        if (state.mode !== "point") return;
+        if (state.lock === "v") {
+          state.v = DEFAULTS.v;
+          commitDirectChange();
+          return;
+        }
+        setV(DEFAULTS.v);
+        return;
+      }
+
+      if (control === "f") {
+        if (state.lock === "f") {
+          state.fixedF = DEFAULTS.fixedF;
+          if (state.mode === "parallel") {
+            state.u = clamp(DEFAULTS.fixedF, LIMITS.uMin, LIMITS.uMax);
+          } else {
+            if (state.u <= state.fixedF + LIMITS.epsilon) {
+              state.u = clamp(state.fixedF + LIMITS.epsilon, LIMITS.uMin, LIMITS.uMax);
+            }
+            applyFixedFromU(state.u);
+          }
+          commitDirectChange();
+          return;
+        }
+        setF(DEFAULTS.fixedF);
+        return;
+      }
+
+      if (control === "m") {
+        if (state.mode !== "point") return;
+        if (state.lock === "m") {
+          state.fixedM = DEFAULTS.fixedM;
+          solveFromFixedMWithU(state.u);
+          commitDirectChange();
+          return;
+        }
+        setM(DEFAULTS.fixedM);
+      }
     }
 
     function reset() {
-      state.mode = "point";
-      state.u = 6;
-      state.v = 6;
-      state.lens = 10;
-      state.fixedF = 3;
-      state.fixedM = 2;
-      state.lock = null;
-      state.zoom = 1;
+      state.mode = DEFAULTS.mode;
+      state.u = DEFAULTS.u;
+      state.v = DEFAULTS.v;
+      state.lens = DEFAULTS.lens;
+      state.fixedF = DEFAULTS.fixedF;
+      state.fixedM = DEFAULTS.fixedM;
+      state.lock = DEFAULTS.lock;
+      state.zoom = DEFAULTS.zoom;
+      state.activeDrag = null;
       updateSceneView();
       scheduleUrlSync();
     }
@@ -2395,14 +2263,19 @@
     bindInput(els.focalInput, els.focalRange, setF);
     bindRange(els.mRange, setM);
 
-    for (const button of [els.pointMode, els.hudPointMode]) {
-      button.addEventListener("click", () => setMode("point"));
-    }
-    for (const button of [els.parallelMode, els.hudParallelMode]) {
-      button.addEventListener("click", () => setMode("parallel"));
-    }
+    els.hudPointMode.addEventListener("click", () => setMode("point"));
+    els.hudParallelMode.addEventListener("click", () => setMode("parallel"));
     for (const button of [els.lockU, els.lockV, els.lockF, els.lockM]) {
       button.addEventListener("click", () => setLock(button.dataset.lock));
+    }
+    for (const button of [els.resetLens, els.resetU, els.resetV, els.resetF, els.resetM]) {
+      button.addEventListener("click", () => resetControl(button.dataset.resetControl));
+    }
+    for (const group of [els.projectionSizeLabelGroup, els.focalLabelGroup]) {
+      bindSceneLabelHover(group);
+    }
+    for (const button of [els.projectionSizeLock, els.focalLock]) {
+      bindSceneLockButton(button);
     }
     els.zoomOutButton.addEventListener("click", () => zoomBy(1 / 1.18));
     els.zoomInButton.addEventListener("click", () => zoomBy(1.18));
@@ -2419,12 +2292,6 @@
       event.preventDefault();
       zoomBy(event.deltaY < 0 ? 1.08 : 1 / 1.08);
     }, { passive: false });
-
-    document.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-step]");
-      if (!button || button.disabled) return;
-      nudge(button.dataset.step, Number(button.dataset.delta));
-    });
 
     els.scene.addEventListener("pointerdown", onPointerDown);
     els.scene.addEventListener("pointermove", onPointerMove);
