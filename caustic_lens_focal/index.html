@@ -1,0 +1,2458 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>焦散透镜焦距与放大率计算器</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090c0f;
+      --bg-2: #0e1317;
+      --panel: rgba(18, 24, 29, 0.82);
+      --panel-solid: #12181d;
+      --panel-soft: rgba(255, 255, 255, 0.045);
+      --line: rgba(185, 210, 224, 0.18);
+      --line-strong: rgba(195, 226, 244, 0.34);
+      --text: #edf7fb;
+      --muted: #8fa3af;
+      --subtle: #60727e;
+      --cyan: #63d9ef;
+      --cyan-soft: rgba(99, 217, 239, 0.16);
+      --amber: #ffd35c;
+      --amber-soft: rgba(255, 211, 92, 0.17);
+      --violet: #a78bfa;
+      --good: #77e6b6;
+      --danger: #ff7d90;
+      --shadow: rgba(0, 0, 0, 0.38);
+      --radius: 8px;
+      --mono: "SFMono-Regular", "Roboto Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+      --ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(39, 113, 130, 0.14), transparent 34rem),
+        linear-gradient(135deg, #090c0f 0%, #0b0f13 54%, #08090b 100%);
+      color: var(--text);
+      font-family: var(--ui);
+      letter-spacing: 0;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    button,
+    input {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    .app {
+      height: 100dvh;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      padding: 18px;
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 50px;
+      padding: 0 2px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(99, 217, 239, 0.42);
+      border-radius: 8px;
+      background: rgba(99, 217, 239, 0.08);
+      box-shadow: inset 0 0 22px rgba(99, 217, 239, 0.06);
+      flex: 0 0 auto;
+    }
+
+    .brand-mark svg {
+      width: 24px;
+      height: 24px;
+      color: var(--cyan);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 24px);
+      line-height: 1.12;
+      font-weight: 720;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.045);
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .icon-button:hover {
+      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.075);
+      transform: translateY(-1px);
+    }
+
+    .icon-button svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 1.8;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 14px;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .stage-card,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(18, 24, 29, 0.78), rgba(12, 17, 21, 0.86));
+      box-shadow: 0 22px 64px var(--shadow);
+      backdrop-filter: blur(16px);
+      min-width: 0;
+    }
+
+    .stage-card {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .stage-toolbar {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 13, 16, 0.54);
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: min(340px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .mode-switch button {
+      height: 36px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .mode-switch button:last-child {
+      border-right: 0;
+    }
+
+    .mode-switch button.active {
+      color: var(--text);
+      background: rgba(99, 217, 239, 0.13);
+    }
+
+    .dot-icon,
+    .parallel-icon {
+      width: 14px;
+      height: 14px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .dot-icon {
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 14px rgba(255, 211, 92, 0.7);
+    }
+
+    .parallel-icon {
+      position: relative;
+    }
+
+    .parallel-icon::before,
+    .parallel-icon::after {
+      content: "";
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      height: 2px;
+      border-radius: 99px;
+      background: currentColor;
+    }
+
+    .parallel-icon::before {
+      top: 4px;
+    }
+
+    .parallel-icon::after {
+      bottom: 4px;
+    }
+
+    .formula-strip {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .formula-strip span {
+      padding: 7px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .stage-tools {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .scene-wrap {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(99, 217, 239, 0.08), transparent 46rem),
+        #0a0f13;
+    }
+
+    .scene-svg {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: block;
+      cursor: default;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .draggable {
+      cursor: grab;
+    }
+
+    .dragging .draggable,
+    .draggable:active {
+      cursor: grabbing;
+    }
+
+    .grid-minor {
+      stroke: rgba(176, 207, 224, 0.075);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .grid-major {
+      stroke: rgba(176, 207, 224, 0.12);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .axis {
+      stroke: rgba(230, 243, 250, 0.56);
+      stroke-width: 1.1;
+      stroke-dasharray: 7 7;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .ray {
+      stroke: rgba(183, 168, 255, 0.88);
+      stroke-width: 1.45;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .ray-source {
+      stroke: rgba(183, 168, 255, 0.88);
+    }
+
+    .ray-parallel {
+      stroke: rgba(183, 168, 255, 0.74);
+      stroke-width: 1.25;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .wall-line {
+      stroke: rgba(241, 245, 248, 0.76);
+      stroke-width: 3;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.26));
+    }
+
+    .projection-line {
+      stroke: var(--amber);
+      stroke-width: 5.5;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 12px rgba(255, 211, 92, 0.46));
+    }
+
+    .projection-dim {
+      stroke: var(--amber);
+      stroke-width: 1;
+      marker-start: url(#arrowAmber);
+      marker-end: url(#arrowAmber);
+      vector-effect: non-scaling-stroke;
+    }
+
+    .lens-body {
+      fill: rgba(99, 217, 239, 0.1);
+      stroke: var(--cyan);
+      stroke-width: 1.8;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 10px rgba(99, 217, 239, 0.36));
+    }
+
+    .lens-edge {
+      stroke: var(--cyan);
+      stroke-width: 1;
+      stroke-linecap: round;
+      stroke-dasharray: 2.2 2.2;
+      opacity: 0.5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .hit-dot {
+      fill: #f6fbff;
+      stroke: rgba(8, 11, 13, 0.7);
+      stroke-width: 1.2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .source-dot {
+      fill: var(--amber);
+      stroke: #fff5bd;
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 12px rgba(255, 211, 92, 0.9));
+    }
+
+    .source-halo {
+      fill: rgba(255, 211, 92, 0.14);
+      stroke: rgba(255, 211, 92, 0.3);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .handle {
+      fill: rgba(237, 247, 251, 0.96);
+      stroke: rgba(8, 11, 13, 0.82);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.45));
+    }
+
+    .handle-ring {
+      fill: rgba(99, 217, 239, 0.08);
+      stroke: rgba(99, 217, 239, 0.52);
+      stroke-width: 1.2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .dim-line {
+      stroke: rgba(237, 247, 251, 0.72);
+      stroke-width: 1;
+      marker-start: url(#arrow);
+      marker-end: url(#arrow);
+      vector-effect: non-scaling-stroke;
+    }
+
+    .dim-tick {
+      stroke: rgba(237, 247, 251, 0.72);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .label {
+      fill: var(--text);
+      font-family: var(--ui);
+      font-size: var(--scene-label-size, 4.2px);
+      font-weight: 650;
+      paint-order: stroke;
+      stroke: rgba(9, 12, 15, 0.9);
+      stroke-width: var(--scene-label-stroke, 2.8px);
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .label-muted {
+      fill: var(--muted);
+      font-weight: 540;
+    }
+
+    .label-cyan {
+      fill: var(--cyan);
+    }
+
+    .label-amber {
+      fill: var(--amber);
+    }
+
+    .dim-label {
+      fill: var(--text);
+      font-family: var(--ui);
+      font-size: var(--scene-label-size, 4.2px);
+      font-weight: 650;
+      paint-order: stroke;
+      stroke: rgba(9, 12, 15, 0.9);
+      stroke-width: var(--scene-label-stroke, 2.8px);
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .projection-size-label {
+      fill: var(--amber);
+    }
+
+    .ruler-text {
+      fill: var(--subtle);
+      font-family: var(--mono);
+      font-size: var(--scene-ruler-size, 3.5px);
+      paint-order: stroke;
+      stroke: rgba(9, 12, 15, 0.86);
+      stroke-width: var(--scene-ruler-stroke, 2px);
+      stroke-linejoin: round;
+    }
+
+    .metric-bar {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+      background: rgba(8, 12, 15, 0.62);
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 13px 16px 14px;
+      border-right: 1px solid var(--line);
+    }
+
+    .metric:last-child {
+      border-right: 0;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 7px;
+      font-family: var(--mono);
+      font-size: clamp(14px, 1.25vw, 17px);
+      line-height: 1.18;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .metric strong.cyan {
+      color: var(--cyan);
+    }
+
+    .metric strong.amber {
+      color: var(--amber);
+    }
+
+    .metric strong.violet {
+      color: var(--violet);
+    }
+
+    .panel {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .panel-section {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-section:last-child {
+      border-bottom: 0;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.2;
+      font-weight: 750;
+    }
+
+    .state-chip {
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 7px;
+      border-radius: 8px;
+      border: 1px solid rgba(99, 217, 239, 0.28);
+      background: rgba(99, 217, 239, 0.08);
+      white-space: nowrap;
+    }
+
+    .control-stack {
+      display: grid;
+      gap: 15px;
+    }
+
+    .control {
+      display: grid;
+      gap: 8px;
+    }
+
+    .control label {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .number-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .unit-input {
+      position: relative;
+      min-width: 0;
+    }
+
+    .unit-input input[type="number"] {
+      width: 100%;
+      height: 40px;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(5, 8, 11, 0.48);
+      padding: 0 42px 0 12px;
+      outline: none;
+      font-family: var(--mono);
+      font-size: 15px;
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .unit-input input[type="number"]:focus {
+      border-color: rgba(99, 217, 239, 0.72);
+      background: rgba(5, 8, 11, 0.68);
+    }
+
+    .unit-input input[type="number"]:disabled {
+      color: var(--subtle);
+      border-color: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .unit-input span {
+      position: absolute;
+      right: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    input[type="range"]:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+    }
+
+    .stepper {
+      display: grid;
+      grid-template-columns: 34px 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .stepper button {
+      width: 34px;
+      height: 40px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .stepper button:last-child {
+      border-right: 0;
+    }
+
+    .stepper button:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .stepper button:disabled {
+      color: var(--subtle);
+      cursor: not-allowed;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .switch-row {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .switch-row span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .switch i {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.07);
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .switch i::after {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: #dbe7ec;
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .switch input:checked + i {
+      border-color: rgba(99, 217, 239, 0.48);
+      background: rgba(99, 217, 239, 0.24);
+    }
+
+    .switch input:checked + i::after {
+      transform: translateX(20px);
+      background: var(--cyan);
+    }
+
+    .readout {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .readout-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .readout-row strong {
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin: 12px 0 0;
+      padding: 10px 11px;
+      border: 1px solid rgba(99, 217, 239, 0.16);
+      border-radius: 8px;
+      background: rgba(99, 217, 239, 0.055);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 1080px) {
+      body {
+        overflow-y: auto;
+      }
+
+      .app {
+        height: auto;
+        min-height: 100dvh;
+        padding: 14px;
+        overflow: visible;
+      }
+
+      .shell {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .panel {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        overflow: hidden;
+      }
+
+      .panel-section {
+        border-bottom: 0;
+        border-right: 1px solid var(--line);
+      }
+
+      .panel-section:last-child {
+        border-right: 0;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        padding: 12px;
+      }
+
+      .topbar,
+      .stage-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .top-actions,
+      .stage-tools,
+      .formula-strip {
+        justify-content: flex-start;
+      }
+
+      .stage-card {
+        grid-template-rows: auto minmax(300px, 42dvh) auto;
+      }
+
+      .scene-wrap,
+      .scene-svg {
+        min-height: 300px;
+      }
+
+      .metric-bar,
+      .panel {
+        grid-template-columns: 1fr;
+      }
+
+      .metric,
+      .panel-section {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .metric:last-child,
+      .panel-section:last-child {
+        border-bottom: 0;
+      }
+
+      .metric {
+        padding: 12px 14px;
+      }
+
+      .metric strong {
+        font-size: 17px;
+      }
+    }
+
+    .app {
+      position: fixed;
+      inset: 0;
+      display: block;
+      padding: 0;
+    }
+
+    .topbar,
+    .stage-toolbar,
+    .metric-bar {
+      display: none;
+    }
+
+    .shell,
+    .stage-card {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .scene-wrap,
+    .scene-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      left: 50%;
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      width: min(1080px, calc(100vw - 28px));
+      padding: 10px 12px 12px;
+      display: block;
+      overflow: visible;
+      transform: translateX(-50%);
+      background: rgba(12, 13, 11, 0.72);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
+      transition: width 180ms ease, padding 180ms ease, background 180ms ease;
+    }
+
+    .panel.collapsed {
+      width: min(900px, calc(100vw - 28px));
+      padding: 8px 12px 10px;
+    }
+
+    .panel.collapsed .hud-body {
+      max-height: 0;
+      margin-top: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+    }
+
+    .panel .collapse-tab {
+      position: absolute;
+      top: -19px;
+      left: 10px;
+      width: 40px;
+      height: 19px;
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      border-radius: 8px 8px 0 0;
+      background: rgba(12, 13, 11, 0.72);
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      line-height: 1;
+      padding: 0;
+      backdrop-filter: blur(18px);
+      display: grid;
+      place-items: center;
+    }
+
+    .panel .collapse-tab::before {
+      content: "▾";
+      display: block;
+      font-size: 17px;
+      line-height: 1;
+      transform-origin: 50% 50%;
+      transition: transform 160ms ease, color 160ms ease;
+    }
+
+    .panel .collapse-tab:hover::before {
+      color: var(--text);
+    }
+
+    .panel.collapsed .collapse-tab::before {
+      transform: rotate(180deg);
+    }
+
+    .hud-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
+      align-items: center;
+      gap: 8px 10px;
+      min-height: 26px;
+      min-width: 0;
+    }
+
+    .hud-summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      overflow: hidden;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .hud-summary span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hud-summary strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .hud-body {
+      max-height: 190px;
+      margin-top: 8px;
+      overflow: hidden;
+      opacity: 1;
+      transform: translateY(0);
+      transition: max-height 220ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-top 220ms ease, opacity 160ms ease, transform 220ms ease;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 8px 22px;
+      min-width: 0;
+    }
+
+    .control {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr) 54px 56px;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      min-height: 26px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .control > * {
+      min-width: 0;
+    }
+
+    .controls .control:nth-child(1) {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .controls .control:nth-child(2) {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .controls .control:nth-child(3) {
+      grid-column: 1;
+      grid-row: 3;
+    }
+
+    .controls .control:nth-child(4) {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    .controls .control:nth-child(5) {
+      grid-column: 2;
+      grid-row: 3;
+    }
+
+    .number-row,
+    .legacy-readout {
+      display: none;
+    }
+
+    .control-name {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .control-value {
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .lock-button {
+      min-width: 56px;
+      height: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .lock-placeholder {
+      width: 56px;
+      height: 24px;
+    }
+
+    .lock-button.active {
+      border-color: rgba(99, 217, 239, 0.58);
+      background: rgba(99, 217, 239, 0.16);
+      color: var(--cyan);
+    }
+
+    .lock-button:disabled {
+      opacity: 0.36;
+      cursor: not-allowed;
+    }
+
+    .hud-mode-switch {
+      width: 148px;
+      height: 24px;
+      border-radius: 8px;
+      align-self: end;
+    }
+
+    .hud-mode-switch button {
+      height: 22px;
+      font-size: 11px;
+      gap: 5px;
+    }
+
+    .hud-mode-switch .dot-icon,
+    .hud-mode-switch .parallel-icon {
+      width: 10px;
+      height: 10px;
+    }
+
+    .view-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .view-controls button {
+      width: 28px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.045);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .view-controls button:hover,
+    .lock-button:hover {
+      border-color: var(--line-strong);
+      color: var(--text);
+    }
+
+    @media (max-width: 760px) {
+      .panel {
+        grid-template-columns: 1fr;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        width: calc(100vw - 20px);
+        max-height: min(300px, calc(100dvh - 96px));
+        padding: 8px 10px 10px;
+      }
+
+      .hud-head {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+      }
+
+      .hud-summary {
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .hud-summary::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hud-mode-switch {
+        width: 126px;
+      }
+
+      .view-controls,
+      #focusChip {
+        display: none;
+      }
+
+      .hud-body {
+        max-height: 220px;
+        overflow-y: auto;
+      }
+
+      .controls {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .control {
+        grid-template-columns: 72px minmax(0, 1fr) 46px 48px;
+        grid-column: auto !important;
+        grid-row: auto !important;
+        gap: 6px;
+      }
+
+      .lock-button {
+        min-width: 48px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="8.5" stroke="currentColor"></circle>
+            <path d="M12 2.8v18.4M2.8 12h18.4M7.4 7.4l9.2 9.2M16.6 7.4l-9.2 9.2" stroke="currentColor" stroke-linecap="round"></path>
+            <circle cx="12" cy="12" r="2.4" stroke="currentColor"></circle>
+          </svg>
+        </div>
+        <div>
+          <h1>焦散透镜焦距与放大率计算器</h1>
+          <p>墙面 <span aria-hidden="true">&lt;---</span> 透镜 <span aria-hidden="true">&lt;---</span> 光源</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="resetButton" type="button" title="恢复默认值" aria-label="恢复默认值">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+            <path d="M3 4.5v5h5"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="shell">
+      <div class="stage-card">
+        <div class="stage-toolbar">
+          <div class="mode-switch" role="tablist" aria-label="光源模式">
+            <button id="pointMode" class="active" type="button" role="tab" aria-selected="true">
+              <span class="dot-icon" aria-hidden="true"></span>
+              点光源
+            </button>
+            <button id="parallelMode" type="button" role="tab" aria-selected="false">
+              <span class="parallel-icon" aria-hidden="true"></span>
+              平行光
+            </button>
+          </div>
+          <div class="stage-tools">
+            <div class="formula-strip" aria-label="计算公式">
+              <span id="formulaF">单位制：1/f = 1/u + 1/v</span>
+              <span id="formulaM">M = (u + v) / v</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="scene-wrap" id="sceneWrap">
+          <svg id="scene" class="scene-svg" viewBox="-11.2 -6.2 22.4 12.4" preserveAspectRatio="xMidYMid meet" aria-labelledby="sceneTitle sceneDesc">
+            <title id="sceneTitle">焦散透镜二维示意图</title>
+            <desc id="sceneDesc">可以拖动墙面和点光源位置，辅助线会实时更新投影范围。</desc>
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 Z" fill="rgba(237, 247, 251, 0.72)"></path>
+              </marker>
+              <marker id="arrowAmber" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 Z" fill="#ffd35c"></path>
+              </marker>
+            </defs>
+
+            <g id="gridLayer"></g>
+            <line id="axisLine" class="axis" x1="-170" y1="0" x2="170" y2="0"></line>
+            <text id="axisLabel" class="label label-muted" x="74" y="7">光轴</text>
+
+            <g id="parallelRayLayer"></g>
+            <g id="rayLayer"></g>
+
+            <g id="wallGroup" class="draggable" data-drag="wall" tabindex="0" role="slider" aria-label="墙面距离">
+              <line id="wallFull" class="wall-line" x1="-60" y1="-58" x2="-60" y2="58"></line>
+              <line id="projectionLine" class="projection-line" x1="-60" y1="-10" x2="-60" y2="10"></line>
+              <line id="projectionDim" class="projection-dim" x1="-67" y1="-10" x2="-67" y2="10"></line>
+              <circle id="wallHandleRing" class="handle-ring" cx="-60" cy="0" r="7.2"></circle>
+              <circle id="wallHandle" class="handle" cx="-60" cy="0" r="3.2"></circle>
+              <text id="wallLabel" class="label" x="-58" y="-48">墙面</text>
+              <text id="projectionLabel" class="label label-amber" x="-88" y="-12">投影范围</text>
+              <text id="projectionSizeLabel" class="dim-label projection-size-label" x="-98" y="2">投影 2.0x = 20.0 cm</text>
+            </g>
+
+            <g id="lensGroup">
+              <path id="lensBody" class="lens-body" d=""></path>
+              <line id="lensEdge" class="lens-edge" x1="0" y1="-0.5" x2="0" y2="0.5"></line>
+              <circle id="lensTopDot" class="hit-dot" cx="0" cy="-0.5" r="1.7"></circle>
+              <circle id="lensBottomDot" class="hit-dot" cx="0" cy="0.5" r="1.7"></circle>
+              <text id="lensLabel" class="label label-cyan" x="3.2" y="-18">透镜 1.0x = 10.0 cm</text>
+            </g>
+
+            <g id="sourceGroup" class="draggable" data-drag="source" tabindex="0" role="slider" aria-label="点光源距离">
+              <circle id="sourceHalo" class="source-halo" cx="60" cy="0" r="8"></circle>
+              <circle id="sourceDot" class="source-dot" cx="60" cy="0" r="3.6"></circle>
+              <circle id="sourceHandleRing" class="handle-ring" cx="60" cy="0" r="9.2"></circle>
+              <text id="sourceLabel" class="label label-amber" x="65" y="-8">点光源</text>
+            </g>
+
+            <g id="parallelSourceGroup" aria-hidden="true">
+              <text class="label label-amber" x="105" y="-28">平行光</text>
+              <path d="M122 -18 h29 M122 0 h29 M122 18 h29" class="ray-parallel"></path>
+              <path d="M146 -22 l7 4 -7 4 M146 -4 l7 4 -7 4 M146 14 l7 4 -7 4" fill="none" class="ray-parallel"></path>
+            </g>
+
+            <g id="dimensionLayer">
+              <line id="uDim" class="dim-line" x1="-60" y1="58" x2="0" y2="58"></line>
+              <line id="uTickA" class="dim-tick" x1="-60" y1="53" x2="-60" y2="63"></line>
+              <line id="uTickB" class="dim-tick" x1="0" y1="53" x2="0" y2="63"></line>
+              <text id="uLabel" class="dim-label" x="-32" y="55">u = 6.0x = 60.0 cm</text>
+
+              <line id="vDim" class="dim-line" x1="0" y1="63" x2="60" y2="63"></line>
+              <line id="vTickA" class="dim-tick" x1="0" y1="58" x2="0" y2="68"></line>
+              <line id="vTickB" class="dim-tick" x1="60" y1="58" x2="60" y2="68"></line>
+              <text id="vLabel" class="dim-label" x="27" y="60">v = 6.0x = 60.0 cm</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="metric-bar" aria-label="实时计算结果">
+          <div class="metric">
+            <span>u 透镜到墙面</span>
+            <strong id="metricU" class="cyan">6.0x = 60.0 cm</strong>
+          </div>
+          <div class="metric">
+            <span>v 透镜到光源</span>
+            <strong id="metricV" class="cyan">6.0x = 60.0 cm</strong>
+          </div>
+          <div class="metric">
+            <span>f 焦距</span>
+            <strong id="metricF" class="amber">3.0x = 30.0 cm</strong>
+          </div>
+          <div class="metric">
+            <span>M 放大率</span>
+            <strong id="metricM" class="violet">2.000</strong>
+          </div>
+          <div class="metric">
+            <span>投影范围</span>
+            <strong id="metricProjection">2.0x = 20.0 cm</strong>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel" id="hudPanel" aria-label="参数控制">
+        <button id="collapseHud" class="collapse-tab" type="button" aria-expanded="true" aria-label="折叠控制面板" title="折叠控制面板"></button>
+        <div class="hud-head">
+          <div class="hud-summary" id="hudSummary" aria-label="当前参数摘要">
+            <span>u <strong>60.0 cm</strong></span>
+            <span>v <strong>60.0 cm</strong></span>
+            <span>f <strong>30.0 cm</strong></span>
+            <span>M <strong>2.000</strong></span>
+          </div>
+          <div class="view-controls" aria-label="视图缩放">
+            <button id="zoomOutButton" type="button" title="缩小视图" aria-label="缩小视图">−</button>
+            <strong class="control-value" id="zoomReadout">100%</strong>
+            <button id="zoomInButton" type="button" title="放大视图" aria-label="放大视图">+</button>
+            <button id="zoomFitButton" type="button" title="重置视图" aria-label="重置视图">⌖</button>
+          </div>
+          <div class="mode-switch hud-mode-switch" role="tablist" aria-label="光源模式">
+            <button id="hudPointMode" class="active" type="button" role="tab" aria-selected="true">
+              <span class="dot-icon" aria-hidden="true"></span>
+              点光源
+            </button>
+            <button id="hudParallelMode" type="button" role="tab" aria-selected="false">
+              <span class="parallel-icon" aria-hidden="true"></span>
+              平行光
+            </button>
+          </div>
+          <span class="state-chip" id="focusChip">无固定</span>
+          <span class="state-chip sr-only" id="modeChip">点光源</span>
+        </div>
+
+        <div class="hud-body">
+          <div class="controls">
+            <div class="control">
+              <label class="control-name" for="lensRange">单位尺寸</label>
+              <input id="lensRange" type="range" min="1" max="20" step="0.5" value="10" aria-label="透镜物理尺寸滑杆">
+              <strong class="control-value" id="lensValue">10.0 cm</strong>
+              <span class="lock-placeholder" aria-hidden="true"></span>
+              <input id="lensInput" class="sr-only" type="number" min="1" max="20" step="0.5" value="10">
+            </div>
+
+            <div class="control">
+              <label class="control-name" for="uRange">投影距离 u</label>
+              <input id="uRange" type="range" min="0.5" max="10" step="0.1" value="6" aria-label="u 距离滑杆">
+              <strong class="control-value" id="uValue">6.0x</strong>
+              <button class="lock-button" id="lockU" type="button" data-lock="u" aria-pressed="false">固定</button>
+              <input id="uInput" class="sr-only" type="number" min="0.5" max="10" step="0.1" value="6">
+            </div>
+
+            <div class="control">
+              <label class="control-name" for="vRange">光源距离 v</label>
+              <input id="vRange" type="range" min="0.5" max="10" step="0.1" value="6" aria-label="v 距离滑杆">
+              <strong class="control-value" id="vValue">6.0x</strong>
+              <button class="lock-button" id="lockV" type="button" data-lock="v" aria-pressed="false">固定</button>
+              <input id="vInput" class="sr-only" type="number" min="0.5" max="10" step="0.1" value="6">
+            </div>
+
+            <div class="control">
+              <label class="control-name" for="focalRange">焦距 f</label>
+              <input id="focalRange" type="range" min="0.5" max="5" step="0.1" value="3" aria-label="固定焦距滑杆">
+              <strong class="control-value" id="fValue">3.0x</strong>
+              <button class="lock-button" id="lockF" type="button" data-lock="f" aria-pressed="false">固定</button>
+              <input id="focalInput" class="sr-only" type="number" min="0.5" max="5" step="0.1" value="3">
+            </div>
+
+            <div class="control">
+              <label class="control-name" for="mRange">放大率 M</label>
+              <input id="mRange" type="range" min="1.05" max="21" step="0.05" value="2" aria-label="M 放大率滑杆">
+              <strong class="control-value" id="mValue">2.0x</strong>
+              <button class="lock-button" id="lockM" type="button" data-lock="m" aria-pressed="false">固定</button>
+            </div>
+          </div>
+        </div>
+        <div class="legacy-readout" hidden>
+          <span id="unitChip">1.0x = 10.0 cm</span>
+          <span id="projectionChip">2.0x</span>
+          <strong id="readoutF">3.0x = 30.0 cm</strong>
+          <strong id="readoutM">2.000 x</strong>
+          <strong id="readoutHalf">1.0x = 10.0 cm</strong>
+          <p id="modeNote">场景使用透镜尺寸作为单位，透镜在画布中固定为 1。改变物理尺寸只换算标注，不改变几何位置。</p>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const LIMITS = {
+      uMin: 0.5,
+      uMax: 10,
+      vMin: 0.5,
+      vMax: 10,
+      lensMin: 1,
+      lensMax: 20,
+      fMin: 0.5,
+      fMax: 5,
+      mMin: 1.05,
+      mMax: 21,
+      epsilon: 0.05
+    };
+
+    const state = {
+      mode: "point",
+      u: 6,
+      v: 6,
+      lens: 10,
+      fixedF: 3,
+      fixedM: 2,
+      lock: null,
+      zoom: 1,
+      activeDrag: null
+    };
+
+    const view = {
+      baseHalfX: 11.2,
+      halfX: 11.2,
+      halfY: 6.2,
+      unit: 0.026,
+      minZoom: 1,
+      maxZoom: 2.24
+    };
+
+    let applyingUrlState = false;
+    let urlSyncQueued = false;
+
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      scene: $("scene"),
+      sceneWrap: $("sceneWrap"),
+      gridLayer: $("gridLayer"),
+      rayLayer: $("rayLayer"),
+      parallelRayLayer: $("parallelRayLayer"),
+      pointMode: $("pointMode"),
+      parallelMode: $("parallelMode"),
+      formulaF: $("formulaF"),
+      formulaM: $("formulaM"),
+      zoomOutButton: $("zoomOutButton"),
+      zoomInButton: $("zoomInButton"),
+      zoomFitButton: $("zoomFitButton"),
+      zoomReadout: $("zoomReadout"),
+      resetButton: $("resetButton"),
+      hudPanel: $("hudPanel"),
+      collapseHud: $("collapseHud"),
+      hudSummary: $("hudSummary"),
+      modeChip: $("modeChip"),
+      focusChip: $("focusChip"),
+      unitChip: $("unitChip"),
+      projectionChip: $("projectionChip"),
+      uInput: $("uInput"),
+      uRange: $("uRange"),
+      vInput: $("vInput"),
+      vRange: $("vRange"),
+      lensInput: $("lensInput"),
+      lensRange: $("lensRange"),
+      focalInput: $("focalInput"),
+      focalRange: $("focalRange"),
+      mRange: $("mRange"),
+      hudPointMode: $("hudPointMode"),
+      hudParallelMode: $("hudParallelMode"),
+      lockU: $("lockU"),
+      lockV: $("lockV"),
+      lockF: $("lockF"),
+      lockM: $("lockM"),
+      lensValue: $("lensValue"),
+      uValue: $("uValue"),
+      vValue: $("vValue"),
+      fValue: $("fValue"),
+      mValue: $("mValue"),
+      wallGroup: $("wallGroup"),
+      wallFull: $("wallFull"),
+      projectionLine: $("projectionLine"),
+      projectionDim: $("projectionDim"),
+      wallHandleRing: $("wallHandleRing"),
+      wallHandle: $("wallHandle"),
+      wallLabel: $("wallLabel"),
+      projectionLabel: $("projectionLabel"),
+      projectionSizeLabel: $("projectionSizeLabel"),
+      lensGroup: $("lensGroup"),
+      lensBody: $("lensBody"),
+      lensEdge: $("lensEdge"),
+      lensTopDot: $("lensTopDot"),
+      lensBottomDot: $("lensBottomDot"),
+      lensLabel: $("lensLabel"),
+      sourceGroup: $("sourceGroup"),
+      sourceHalo: $("sourceHalo"),
+      sourceDot: $("sourceDot"),
+      sourceHandleRing: $("sourceHandleRing"),
+      sourceLabel: $("sourceLabel"),
+      parallelSourceGroup: $("parallelSourceGroup"),
+      axisLine: $("axisLine"),
+      axisLabel: $("axisLabel"),
+      uDim: $("uDim"),
+      uTickA: $("uTickA"),
+      uTickB: $("uTickB"),
+      uLabel: $("uLabel"),
+      vDim: $("vDim"),
+      vTickA: $("vTickA"),
+      vTickB: $("vTickB"),
+      vLabel: $("vLabel"),
+      metricU: $("metricU"),
+      metricV: $("metricV"),
+      metricF: $("metricF"),
+      metricM: $("metricM"),
+      metricProjection: $("metricProjection"),
+      readoutF: $("readoutF"),
+      readoutM: $("readoutM"),
+      readoutHalf: $("readoutHalf"),
+      modeNote: $("modeNote")
+    };
+
+    const fmt = (value, digits = 1) => Number(value).toFixed(digits);
+    const cm = (value, digits = 1) => `${fmt(value, digits)} cm`;
+    const unit = (value, digits = 1) => `${fmt(value, digits)}x`;
+    const physicalCm = (unitValue) => unitValue * state.lens;
+    const unitAndCm = (unitValue, digits = 1) => `${unit(unitValue, digits)} = ${cm(physicalCm(unitValue))}`;
+    const cmAndUnit = (unitValue, digits = 1) => `${cm(physicalCm(unitValue))} (${unit(unitValue, digits)})`;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const roundStep = (value, step = 0.5) => Math.round(value / step) * step;
+
+    function pointFocal(u = state.u, v = state.v) {
+      return (u * v) / (u + v);
+    }
+
+    function currentFocal() {
+      return state.mode === "parallel" ? state.u : pointFocal();
+    }
+
+    function currentMagnification() {
+      return state.mode === "parallel" ? 1 : (state.u + state.v) / state.v;
+    }
+
+    function projectionHeight() {
+      return currentMagnification();
+    }
+
+    function solveUFromV(v, f) {
+      return (f * v) / (v - f);
+    }
+
+    function solveVFromU(u, f) {
+      return (f * u) / (u - f);
+    }
+
+    function setAttr(el, attrs) {
+      for (const [key, value] of Object.entries(attrs)) {
+        el.setAttribute(key, value);
+      }
+    }
+
+    function makeSvg(tag, attrs = {}) {
+      const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      setAttr(node, attrs);
+      return node;
+    }
+
+    function gridStart(min, step) {
+      return Math.ceil(min / step) * step;
+    }
+
+    function screenUnit(px) {
+      return px * view.unit;
+    }
+
+    function buildGrid() {
+      const fragment = document.createDocumentFragment();
+      const minX = -view.halfX;
+      const maxX = view.halfX;
+      const minY = -view.halfY;
+      const maxY = view.halfY;
+      const step = 1;
+      const labelStep = step;
+      const topLabelY = minY + screenUnit(16);
+      const leftLabelX = minX + screenUnit(8);
+
+      for (let x = gridStart(minX, step); x <= maxX; x += step) {
+        const roundedX = Number(x.toFixed(2));
+        fragment.appendChild(makeSvg("line", {
+          x1: roundedX,
+          y1: minY,
+          x2: roundedX,
+          y2: maxY,
+          class: "grid-major"
+        }));
+        if (Math.abs(roundedX % labelStep) < 0.01 && roundedX !== 0) {
+          fragment.appendChild(makeSvg("text", {
+            x: roundedX,
+            y: topLabelY,
+            class: "ruler-text",
+            "text-anchor": "middle"
+          })).textContent = String(roundedX);
+        }
+      }
+      for (let y = gridStart(minY, step); y <= maxY; y += step) {
+        const roundedY = Number(y.toFixed(2));
+        fragment.appendChild(makeSvg("line", {
+          x1: minX,
+          y1: roundedY,
+          x2: maxX,
+          y2: roundedY,
+          class: "grid-major"
+        }));
+        if (Math.abs(roundedY % labelStep) < 0.01 && roundedY !== 0) {
+          fragment.appendChild(makeSvg("text", {
+            x: leftLabelX,
+            y: roundedY + screenUnit(4),
+            class: "ruler-text",
+            "text-anchor": "start"
+          })).textContent = String(-roundedY);
+        }
+      }
+      fragment.appendChild(makeSvg("text", {
+        x: minX + screenUnit(8),
+        y: maxY - screenUnit(8),
+        class: "ruler-text",
+        "text-anchor": "start"
+      })).textContent = "单位";
+      els.gridLayer.replaceChildren(fragment);
+    }
+
+    function updateSceneView(shouldRender = true) {
+      const rect = els.sceneWrap.getBoundingClientRect();
+      const aspect = rect.width > 0 && rect.height > 0 ? rect.width / rect.height : 16 / 9;
+      const isMobile = rect.width > 0 && rect.width < 620;
+      const sourceExtent = state.mode === "point" ? state.v : 0;
+      const mobileHalfX = clamp(Math.max(state.u, sourceExtent, 5.5) + 1.1, 6.8, view.baseHalfX);
+      const baseHalfX = isMobile ? mobileHalfX : view.baseHalfX;
+      const zoomedHalfX = baseHalfX / state.zoom;
+      const desiredHalfY = Math.max(zoomedHalfX / aspect, projectionHeight() / 2 + 1.4, 2.8);
+      view.halfX = Math.max(zoomedHalfX, desiredHalfY * aspect);
+      view.halfY = view.halfX / aspect;
+      const pxPerUnit = rect.width > 0 ? rect.width / (view.halfX * 2) : 1;
+      view.unit = 1 / pxPerUnit;
+      const compact = rect.width < 520;
+      els.scene.style.setProperty("--scene-label-size", `${screenUnit(compact ? 11 : 12)}px`);
+      els.scene.style.setProperty("--scene-label-stroke", `${screenUnit(compact ? 4.2 : 3.6)}px`);
+      els.scene.style.setProperty("--scene-dim-size", `${screenUnit(compact ? 10 : 11)}px`);
+      els.scene.style.setProperty("--scene-dim-stroke", `${screenUnit(compact ? 3.8 : 3.2)}px`);
+      els.scene.style.setProperty("--scene-ruler-size", `${screenUnit(compact ? 8 : 9)}px`);
+      els.scene.style.setProperty("--scene-ruler-stroke", `${screenUnit(compact ? 3 : 2.6)}px`);
+      els.scene.setAttribute("viewBox", `${-view.halfX} ${-view.halfY} ${view.halfX * 2} ${view.halfY * 2}`);
+      buildGrid();
+      if (shouldRender) render();
+    }
+
+    function setZoom(value) {
+      state.zoom = clamp(value, view.minZoom, view.maxZoom);
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function zoomBy(factor) {
+      setZoom(state.zoom * factor);
+    }
+
+    function svgPointFromEvent(event) {
+      const pt = els.scene.createSVGPoint();
+      pt.x = event.clientX;
+      pt.y = event.clientY;
+      return pt.matrixTransform(els.scene.getScreenCTM().inverse());
+    }
+
+    function applyFixedFromU(nextU) {
+      const f = state.fixedF;
+      if (state.mode === "parallel") {
+        state.u = clamp(f, LIMITS.uMin, LIMITS.uMax);
+        return;
+      }
+      const safeU = clamp(Math.max(nextU, f + LIMITS.epsilon), LIMITS.uMin, LIMITS.uMax);
+      const solvedV = solveVFromU(safeU, f);
+      if (Number.isFinite(solvedV) && solvedV <= LIMITS.vMax) {
+        state.u = safeU;
+        state.v = clamp(solvedV, LIMITS.vMin, LIMITS.vMax);
+        return;
+      }
+      state.v = LIMITS.vMax;
+      state.u = clamp(solveUFromV(state.v, f), LIMITS.uMin, LIMITS.uMax);
+    }
+
+    function applyFixedFromV(nextV) {
+      const f = state.fixedF;
+      const safeV = clamp(Math.max(nextV, f + LIMITS.epsilon), LIMITS.vMin, LIMITS.vMax);
+      const solvedU = solveUFromV(safeV, f);
+      if (Number.isFinite(solvedU) && solvedU <= LIMITS.uMax) {
+        state.v = safeV;
+        state.u = clamp(solvedU, LIMITS.uMin, LIMITS.uMax);
+        return;
+      }
+      state.u = LIMITS.uMax;
+      state.v = clamp(solveVFromU(state.u, f), LIMITS.vMin, LIMITS.vMax);
+    }
+
+    function syncDerived() {
+      state.fixedF = clamp(currentFocal(), 0.01, LIMITS.fMax);
+      state.fixedM = clamp(currentMagnification(), LIMITS.mMin, LIMITS.mMax);
+    }
+
+    function clampFForFixedM(f, m) {
+      const minF = Math.max(LIMITS.fMin, LIMITS.uMin / m, (LIMITS.vMin * (m - 1)) / m);
+      const maxF = Math.min(LIMITS.fMax, LIMITS.uMax / m, (LIMITS.vMax * (m - 1)) / m);
+      return clamp(f, minF, maxF);
+    }
+
+    function clampMForFixedF(m, f) {
+      const minFromVMax = LIMITS.vMax > f ? LIMITS.vMax / (LIMITS.vMax - f) : LIMITS.mMax;
+      const minM = Math.max(LIMITS.mMin, LIMITS.uMin / f, minFromVMax);
+      const maxM = Math.min(LIMITS.mMax, LIMITS.uMax / f);
+      return clamp(m, minM, maxM);
+    }
+
+    function clampFForFixedU(f, u) {
+      const minF = Math.max(LIMITS.fMin, (LIMITS.vMin * u) / (u + LIMITS.vMin));
+      const maxF = Math.min(LIMITS.fMax, (LIMITS.vMax * u) / (u + LIMITS.vMax), u - LIMITS.epsilon);
+      return clamp(f, minF, maxF);
+    }
+
+    function clampFForFixedV(f, v) {
+      const minF = Math.max(LIMITS.fMin, (LIMITS.uMin * v) / (v + LIMITS.uMin));
+      const maxF = Math.min(LIMITS.fMax, (LIMITS.uMax * v) / (v + LIMITS.uMax), v - LIMITS.epsilon);
+      return clamp(f, minF, maxF);
+    }
+
+    function clampMForFixedU(m, u) {
+      return clamp(m, Math.max(LIMITS.mMin, 1 + u / LIMITS.vMax), Math.min(LIMITS.mMax, 1 + u / LIMITS.vMin));
+    }
+
+    function clampMForFixedV(m, v) {
+      return clamp(m, Math.max(LIMITS.mMin, 1 + LIMITS.uMin / v), Math.min(LIMITS.mMax, 1 + LIMITS.uMax / v));
+    }
+
+    function solveFromFixedMWithU(nextU) {
+      const ratio = Math.max(state.fixedM - 1, LIMITS.epsilon);
+      const feasibleU = clamp(nextU, Math.max(LIMITS.uMin, LIMITS.vMin * ratio), Math.min(LIMITS.uMax, LIMITS.vMax * ratio));
+      state.u = feasibleU;
+      state.v = feasibleU / ratio;
+    }
+
+    function solveFromFixedMWithV(nextV) {
+      const ratio = Math.max(state.fixedM - 1, LIMITS.epsilon);
+      const feasibleV = clamp(nextV, Math.max(LIMITS.vMin, LIMITS.uMin / ratio), Math.min(LIMITS.vMax, LIMITS.uMax / ratio));
+      state.v = feasibleV;
+      state.u = ratio * feasibleV;
+    }
+
+    function solveFromFAndM(nextF, nextM, fixedAxis = null) {
+      let m = clamp(nextM, LIMITS.mMin, LIMITS.mMax);
+      let f = clamp(nextF, LIMITS.fMin, LIMITS.fMax);
+      if (fixedAxis === "m") {
+        f = clampFForFixedM(f, m);
+      } else if (fixedAxis === "f") {
+        m = clampMForFixedF(m, f);
+      }
+      state.fixedM = m;
+      state.fixedF = f;
+      state.u = f * m;
+      state.v = (f * m) / Math.max(m - 1, LIMITS.epsilon);
+    }
+
+    function setU(value) {
+      const next = clamp(roundStep(value, 0.1), LIMITS.uMin, LIMITS.uMax);
+      if (state.lock === "u") return;
+      if (state.mode === "parallel") {
+        state.u = next;
+        syncDerived();
+      } else if (state.lock === "f") {
+        applyFixedFromU(next);
+        syncDerived();
+      } else if (state.lock === "v") {
+        state.u = next;
+        syncDerived();
+      } else if (state.lock === "m") {
+        solveFromFixedMWithU(next);
+        state.fixedF = currentFocal();
+      } else {
+        state.u = next;
+        syncDerived();
+      }
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function setV(value) {
+      const next = clamp(roundStep(value, 0.1), LIMITS.vMin, LIMITS.vMax);
+      if (state.mode !== "point" || state.lock === "v") return;
+      if (state.lock === "f") {
+        applyFixedFromV(next);
+        syncDerived();
+      } else if (state.lock === "u") {
+        state.v = next;
+        syncDerived();
+      } else if (state.lock === "m") {
+        solveFromFixedMWithV(next);
+        state.fixedF = currentFocal();
+      } else {
+        state.v = next;
+        syncDerived();
+      }
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function setLens(value) {
+      state.lens = clamp(roundStep(value), LIMITS.lensMin, LIMITS.lensMax);
+      render();
+      scheduleUrlSync();
+    }
+
+    function setF(value) {
+      const next = clamp(roundStep(value, 0.1), LIMITS.fMin, LIMITS.fMax);
+      if (state.lock === "f") return;
+      state.fixedF = next;
+      if (state.mode === "parallel") {
+        state.u = clamp(next, LIMITS.uMin, LIMITS.uMax);
+        syncDerived();
+      } else if (state.lock === "u") {
+        state.fixedF = clampFForFixedU(next, state.u);
+        state.v = clamp(solveVFromU(state.u, state.fixedF), LIMITS.vMin, LIMITS.vMax);
+        syncDerived();
+      } else if (state.lock === "v") {
+        state.fixedF = clampFForFixedV(next, state.v);
+        state.u = clamp(solveUFromV(state.v, state.fixedF), LIMITS.uMin, LIMITS.uMax);
+        syncDerived();
+      } else if (state.lock === "m") {
+        solveFromFAndM(next, state.fixedM, "m");
+      } else {
+        if (state.u <= next + LIMITS.epsilon) {
+          state.u = clamp(next + LIMITS.epsilon, LIMITS.uMin, LIMITS.uMax);
+        }
+        applyFixedFromU(state.u);
+        syncDerived();
+      }
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function setM(value) {
+      if (state.mode === "parallel" || state.lock === "m") return;
+      const next = clamp(roundStep(value, 0.05), LIMITS.mMin, LIMITS.mMax);
+      state.fixedM = next;
+      if (state.lock === "f") {
+        solveFromFAndM(state.fixedF, next, "f");
+      } else if (state.lock === "u") {
+        state.fixedM = clampMForFixedU(next, state.u);
+        state.v = state.u / Math.max(state.fixedM - 1, LIMITS.epsilon);
+        syncDerived();
+      } else if (state.lock === "v") {
+        state.fixedM = clampMForFixedV(next, state.v);
+        state.u = (state.fixedM - 1) * state.v;
+        syncDerived();
+      } else {
+        state.fixedM = clampMForFixedV(next, state.v);
+        state.u = (state.fixedM - 1) * state.v;
+        syncDerived();
+      }
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      if (mode === "parallel" && (state.lock === "v" || state.lock === "m")) {
+        state.lock = null;
+      }
+      syncDerived();
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function setLock(lockName) {
+      const next = state.lock === lockName ? null : lockName;
+      if (state.mode === "parallel" && (next === "v" || next === "m")) return;
+      state.lock = next;
+      if (state.lock === "f") {
+        state.fixedF = clamp(roundStep(currentFocal(), 0.1), LIMITS.fMin, LIMITS.fMax);
+      }
+      if (state.lock === "m") {
+        state.fixedM = clamp(roundStep(currentMagnification(), 0.05), LIMITS.mMin, LIMITS.mMax);
+      }
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    function readUrlNumber(params, names, min, max, step = 0.1) {
+      for (const name of names) {
+        const raw = params.get(name);
+        if (raw === null || raw.trim() === "") continue;
+        const value = Number.parseFloat(raw);
+        if (Number.isFinite(value)) {
+          return clamp(roundStep(value, step), min, max);
+        }
+      }
+      return null;
+    }
+
+    function readUrlMode(params) {
+      const raw = (params.get("mode") || params.get("source") || params.get("light") || "").trim().toLowerCase();
+      if (["parallel", "plane", "collimated", "inf", "infinity", "平行", "平行光"].includes(raw)) return "parallel";
+      if (["point", "spot", "source", "点", "点光源"].includes(raw)) return "point";
+      return null;
+    }
+
+    function readUrlLock(params, mode) {
+      const raw = (params.get("lock") || params.get("fixed") || "").trim().toLowerCase();
+      const aliases = {
+        u: "u",
+        wall: "u",
+        projection: "u",
+        v: "v",
+        source: "v",
+        f: "f",
+        focal: "f",
+        focus: "f",
+        m: "m",
+        mag: "m",
+        magnification: "m"
+      };
+      const lock = aliases[raw] || null;
+      if (mode === "parallel" && (lock === "v" || lock === "m")) return null;
+      return lock;
+    }
+
+    function applyPointUrlGeometry(values) {
+      const hasU = values.u !== null;
+      const hasV = values.v !== null;
+      const hasF = values.f !== null;
+      const hasM = values.m !== null;
+
+      if (hasU && hasV) {
+        state.u = values.u;
+        state.v = values.v;
+      } else if (hasF && hasM) {
+        solveFromFAndM(values.f, values.m, "f");
+      } else if (hasU && hasF) {
+        state.u = values.u;
+        state.fixedF = clampFForFixedU(values.f, state.u);
+        state.v = solveVFromU(state.u, state.fixedF);
+      } else if (hasV && hasF) {
+        state.v = values.v;
+        state.fixedF = clampFForFixedV(values.f, state.v);
+        state.u = solveUFromV(state.v, state.fixedF);
+      } else if (hasU && hasM) {
+        state.u = values.u;
+        state.fixedM = clampMForFixedU(values.m, state.u);
+        state.v = state.u / Math.max(state.fixedM - 1, LIMITS.epsilon);
+      } else if (hasV && hasM) {
+        state.v = values.v;
+        state.fixedM = clampMForFixedV(values.m, state.v);
+        state.u = (state.fixedM - 1) * state.v;
+      } else if (hasU) {
+        state.u = values.u;
+      } else if (hasV) {
+        state.v = values.v;
+      } else if (hasF) {
+        state.fixedF = clampFForFixedU(values.f, state.u);
+        state.v = solveVFromU(state.u, state.fixedF);
+      } else if (hasM) {
+        state.fixedM = clampMForFixedV(values.m, state.v);
+        state.u = (state.fixedM - 1) * state.v;
+      }
+
+      state.u = clamp(state.u, LIMITS.uMin, LIMITS.uMax);
+      state.v = clamp(state.v, LIMITS.vMin, LIMITS.vMax);
+      syncDerived();
+    }
+
+    function applyUrlState() {
+      const params = new URLSearchParams(window.location.search);
+      if (![...params.keys()].length) return false;
+
+      applyingUrlState = true;
+      const lens = readUrlNumber(params, ["x", "lens", "size", "unit"], LIMITS.lensMin, LIMITS.lensMax, 0.5);
+      const mode = readUrlMode(params) || "point";
+      const values = {
+        u: readUrlNumber(params, ["u"], LIMITS.uMin, LIMITS.uMax, 0.1),
+        v: readUrlNumber(params, ["v"], LIMITS.vMin, LIMITS.vMax, 0.1),
+        f: readUrlNumber(params, ["f", "focus", "focal"], LIMITS.fMin, LIMITS.fMax, 0.1),
+        m: readUrlNumber(params, ["m", "mag", "magnification"], LIMITS.mMin, LIMITS.mMax, 0.05)
+      };
+
+      if (lens !== null) state.lens = lens;
+      state.mode = mode;
+
+      if (state.mode === "parallel") {
+        state.u = values.u ?? values.f ?? state.u;
+        state.u = clamp(state.u, LIMITS.uMin, LIMITS.uMax);
+        syncDerived();
+      } else {
+        applyPointUrlGeometry(values);
+      }
+
+      state.lock = readUrlLock(params, state.mode);
+      state.zoom = readUrlNumber(params, ["zoom", "z"], view.minZoom, view.maxZoom, 0.01) ?? state.zoom;
+      applyingUrlState = false;
+      return true;
+    }
+
+    function canonicalParams() {
+      const params = new URLSearchParams();
+      params.set("x", fmt(state.lens, 1));
+      params.set("mode", state.mode);
+      params.set("u", fmt(state.u, 1));
+      if (state.mode === "point") {
+        params.set("v", fmt(state.v, 1));
+      }
+      if (state.lock) {
+        params.set("lock", state.lock);
+      }
+      if (Math.abs(state.zoom - 1) > 0.005) {
+        params.set("zoom", fmt(state.zoom, 2));
+      }
+      return params;
+    }
+
+    function writeUrlState() {
+      if (!window.history || applyingUrlState) return;
+      const url = new URL(window.location.href);
+      url.search = canonicalParams().toString();
+      window.history.replaceState(null, "", url);
+    }
+
+    function scheduleUrlSync() {
+      if (applyingUrlState || urlSyncQueued) return;
+      urlSyncQueued = true;
+      window.requestAnimationFrame(() => {
+        urlSyncQueued = false;
+        writeUrlState();
+      });
+    }
+
+    function updateInput(input, value, digits = 1) {
+      if (document.activeElement !== input) {
+        input.value = fmt(value, digits);
+      }
+    }
+
+    function setSvgLines(el, lines, x, y, gap = 14) {
+      setAttr(el, { x, y });
+      const fragment = document.createDocumentFragment();
+      lines.forEach((line, index) => {
+        const tspan = makeSvg("tspan", {
+          x,
+          dy: index === 0 ? 0 : screenUnit(gap)
+        });
+        tspan.textContent = line;
+        fragment.appendChild(tspan);
+      });
+      el.replaceChildren(fragment);
+    }
+
+    function rayLine(x1, y1, x2, y2, extraClass = "") {
+      return makeSvg("line", {
+        x1,
+        y1,
+        x2,
+        y2,
+        class: `ray ${extraClass}`.trim()
+      });
+    }
+
+    function drawRays(wallX, topLens, bottomLens, topWall, bottomWall) {
+      const rays = document.createDocumentFragment();
+      const sourceX = state.v;
+
+      if (state.mode === "point") {
+        rays.appendChild(rayLine(sourceX, 0, 0, topLens, "ray-source"));
+        rays.appendChild(rayLine(0, topLens, wallX, topWall));
+        rays.appendChild(rayLine(sourceX, 0, 0, bottomLens, "ray-source"));
+        rays.appendChild(rayLine(0, bottomLens, wallX, bottomWall));
+      } else {
+        const parallelStartX = view.halfX - screenUnit(24);
+        rays.appendChild(rayLine(parallelStartX, topLens, 0, topLens, "ray-source"));
+        rays.appendChild(rayLine(0, topLens, wallX, topWall));
+        rays.appendChild(rayLine(parallelStartX, bottomLens, 0, bottomLens, "ray-source"));
+        rays.appendChild(rayLine(0, bottomLens, wallX, bottomWall));
+      }
+
+      els.rayLayer.replaceChildren(rays);
+    }
+
+    function renderParallelGuides(topLens, bottomLens) {
+      const guides = document.createDocumentFragment();
+      if (state.mode === "parallel") {
+        const rightX = view.halfX - screenUnit(12);
+        const leftX = Math.max(screenUnit(28), rightX - screenUnit(76));
+        for (const y of [topLens, 0, bottomLens]) {
+          guides.appendChild(makeSvg("line", {
+            x1: leftX,
+            y1: y,
+            x2: rightX,
+            y2: y,
+            class: "ray-parallel"
+          }));
+        }
+      }
+      els.parallelRayLayer.replaceChildren(guides);
+    }
+
+    function render() {
+      const u = state.u;
+      const v = state.v;
+      const lensPhysical = state.lens;
+      const lensUnit = 1;
+      const f = currentFocal();
+      const mag = currentMagnification();
+      const projection = projectionHeight();
+      const halfLens = lensUnit / 2;
+      const topLens = -halfLens;
+      const bottomLens = halfLens;
+      const topWall = -projection / 2;
+      const bottomWall = projection / 2;
+      const wallX = -u;
+      const sourceX = v;
+      const minX = -view.halfX;
+      const maxX = view.halfX;
+      const minY = -view.halfY;
+      const maxY = view.halfY;
+      const edgePad = screenUnit(18);
+      const wallTop = minY + edgePad;
+      const wallBottom = maxY - edgePad;
+      const lensWidth = lensUnit * 0.17;
+      const lensPath = [
+        `M 0 ${topLens}`,
+        `C ${-lensWidth} ${topLens + lensUnit * 0.18}, ${-lensWidth} ${bottomLens - lensUnit * 0.18}, 0 ${bottomLens}`,
+        `C ${lensWidth} ${bottomLens - lensUnit * 0.18}, ${lensWidth} ${topLens + lensUnit * 0.18}, 0 ${topLens}`,
+        "Z"
+      ].join(" ");
+      const projectionDimX = wallX - screenUnit(12);
+      const projectionLabelX = wallX - minX > screenUnit(100)
+        ? wallX - screenUnit(16)
+        : wallX + screenUnit(80);
+      const projectionSizeY = Math.max(topWall - screenUnit(18), wallTop + screenUnit(20));
+      const dimY = clamp(topWall - screenUnit(30), minY + edgePad + screenUnit(18), maxY - edgePad - screenUnit(12));
+      const dimY2 = dimY;
+      const tick = screenUnit(10);
+
+      setAttr(els.axisLine, { x1: minX + screenUnit(8), x2: maxX - screenUnit(8) });
+      setAttr(els.axisLabel, { x: clamp(sourceX + screenUnit(32), screenUnit(40), maxX - screenUnit(48)), y: screenUnit(15) });
+      setAttr(els.wallFull, { x1: wallX, x2: wallX, y1: wallTop, y2: wallBottom });
+      setAttr(els.projectionLine, { x1: wallX, x2: wallX, y1: topWall, y2: bottomWall });
+      setAttr(els.projectionDim, { x1: projectionDimX, x2: projectionDimX, y1: topWall, y2: bottomWall });
+      setAttr(els.wallHandleRing, { cx: wallX, cy: 0, r: screenUnit(13) });
+      setAttr(els.wallHandle, { cx: wallX, cy: 0, r: screenUnit(5) });
+      els.wallLabel.textContent = "";
+      els.projectionLabel.textContent = "";
+      setAttr(els.projectionSizeLabel, { "text-anchor": wallX - minX > screenUnit(100) ? "end" : "start" });
+      setSvgLines(els.projectionSizeLabel, ["投影尺寸", cmAndUnit(projection)], projectionLabelX, projectionSizeY, 13);
+
+      setAttr(els.lensBody, { d: lensPath });
+      setAttr(els.lensEdge, { x1: 0, y1: topLens, x2: 0, y2: bottomLens });
+      setAttr(els.lensTopDot, { cx: 0, cy: topLens, r: screenUnit(3.6) });
+      setAttr(els.lensBottomDot, { cx: 0, cy: bottomLens, r: screenUnit(3.6) });
+      setSvgLines(els.lensLabel, ["透镜尺寸", `${cm(lensPhysical)} (${unit(lensUnit)})`], screenUnit(11), topLens - screenUnit(16), 13);
+
+      setAttr(els.sourceHalo, { cx: sourceX, cy: 0, r: screenUnit(15) });
+      setAttr(els.sourceDot, { cx: sourceX, cy: 0, r: screenUnit(6.5) });
+      setAttr(els.sourceHandleRing, { cx: sourceX, cy: 0, r: screenUnit(17) });
+      els.sourceLabel.textContent = "";
+
+      drawRays(wallX, topLens, bottomLens, topWall, bottomWall);
+      renderParallelGuides(topLens, bottomLens);
+
+      const sourceVisible = state.mode === "point";
+      els.sourceGroup.style.display = sourceVisible ? "" : "none";
+      els.parallelSourceGroup.style.display = "none";
+
+      setAttr(els.uDim, { x1: wallX, y1: dimY, x2: 0, y2: dimY });
+      setAttr(els.uTickA, { x1: wallX, x2: wallX, y1: dimY - tick, y2: dimY + tick });
+      setAttr(els.uTickB, { x1: 0, x2: 0, y1: dimY - tick, y2: dimY + tick });
+      setAttr(els.uLabel, { "text-anchor": "middle" });
+      setSvgLines(els.uLabel, ["投影距离 u", cmAndUnit(u)], wallX / 2, dimY - screenUnit(2), 14);
+
+      const vDimEnd = sourceVisible ? sourceX : maxX - screenUnit(34);
+      setAttr(els.vDim, { x1: 0, y1: dimY2, x2: vDimEnd, y2: dimY2 });
+      setAttr(els.vTickA, { x1: 0, x2: 0, y1: dimY2 - tick, y2: dimY2 + tick });
+      setAttr(els.vTickB, { x1: vDimEnd, x2: vDimEnd, y1: dimY2 - tick, y2: dimY2 + tick });
+      setAttr(els.vLabel, { "text-anchor": "middle" });
+      setSvgLines(
+        els.vLabel,
+        sourceVisible ? ["光源距离 v", cmAndUnit(v)] : ["光源距离 v", "∞"],
+        vDimEnd / 2,
+        dimY2 - screenUnit(2),
+        14
+      );
+
+      els.metricU.textContent = unitAndCm(u);
+      els.metricV.textContent = sourceVisible ? unitAndCm(v) : "∞";
+      els.metricF.textContent = unitAndCm(f);
+      els.metricM.textContent = fmt(mag, 3);
+      els.metricProjection.textContent = unitAndCm(projection);
+      els.readoutF.textContent = unitAndCm(f);
+      els.readoutM.textContent = `${fmt(mag, 3)} x`;
+      els.readoutHalf.textContent = unitAndCm(projection / 2);
+      els.projectionChip.textContent = unit(projection);
+      els.unitChip.textContent = `${unit(lensUnit)} = ${cm(lensPhysical)}`;
+      els.lensValue.textContent = cm(lensPhysical);
+      els.uValue.textContent = unit(u);
+      els.vValue.textContent = sourceVisible ? unit(v) : "∞";
+      els.fValue.textContent = unit(f);
+      els.mValue.textContent = `${fmt(mag, 1)}x`;
+      els.zoomReadout.textContent = `${Math.round(state.zoom * 100)}%`;
+      els.hudSummary.innerHTML = [
+        `<span>u <strong>${cm(physicalCm(u))}</strong></span>`,
+        `<span>v <strong>${sourceVisible ? cm(physicalCm(v)) : "∞"}</strong></span>`,
+        `<span>f <strong>${cm(physicalCm(f))}</strong></span>`,
+        `<span>M <strong>${fmt(mag, 3)}</strong></span>`,
+        `<span>投影 <strong>${cm(physicalCm(projection))}</strong></span>`
+      ].join("");
+
+      updateInput(els.uInput, u);
+      els.uRange.value = String(u);
+      updateInput(els.vInput, v);
+      els.vRange.value = String(v);
+      updateInput(els.lensInput, lensPhysical);
+      els.lensRange.value = String(lensPhysical);
+      updateInput(els.focalInput, f);
+      els.focalRange.value = String(clamp(f, LIMITS.fMin, LIMITS.fMax));
+      els.mRange.value = String(clamp(mag, LIMITS.mMin, LIMITS.mMax));
+
+      els.uRange.disabled = state.lock === "u";
+      els.vInput.disabled = state.mode === "parallel";
+      els.vRange.disabled = state.mode === "parallel" || state.lock === "v";
+      els.focalRange.disabled = state.lock === "f";
+      els.mRange.disabled = state.mode === "parallel" || state.lock === "m";
+      document.querySelectorAll('[data-step="v"]').forEach((button) => {
+        button.disabled = state.mode === "parallel" || state.lock === "v";
+      });
+
+      for (const button of [els.pointMode, els.hudPointMode]) {
+        button.classList.toggle("active", state.mode === "point");
+        button.setAttribute("aria-selected", String(state.mode === "point"));
+      }
+      for (const button of [els.parallelMode, els.hudParallelMode]) {
+        button.classList.toggle("active", state.mode === "parallel");
+        button.setAttribute("aria-selected", String(state.mode === "parallel"));
+      }
+
+      const lockLabels = { u: "固定 u", v: "固定 v", f: "固定 f", m: "固定 M" };
+      els.focusChip.textContent = state.lock ? lockLabels[state.lock] : "无固定";
+      for (const [key, button] of Object.entries({ u: els.lockU, v: els.lockV, f: els.lockF, m: els.lockM })) {
+        const active = state.lock === key;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+        button.textContent = active ? "已固定" : "固定";
+        button.disabled = state.mode === "parallel" && (key === "v" || key === "m");
+      }
+
+      els.modeChip.textContent = state.mode === "point" ? "点光源" : "平行光";
+      els.formulaF.textContent = state.mode === "point" ? "单位制：1/f = 1/u + 1/v" : "平行光：f = u";
+      els.formulaM.textContent = state.mode === "point" ? "M = (u + v) / v" : "M = 1";
+      els.modeNote.textContent = state.mode === "point"
+        ? "场景使用透镜尺寸作为单位，透镜在画布中固定为 1。改变物理尺寸只换算标注，不改变几何位置。"
+        : "平行光等效为光源在无限远处，投影范围保持为 1 个单位，焦距等于透镜到墙面的单位距离。";
+
+      els.wallGroup.setAttribute("aria-valuemin", LIMITS.uMin);
+      els.wallGroup.setAttribute("aria-valuemax", LIMITS.uMax);
+      els.wallGroup.setAttribute("aria-valuenow", fmt(u));
+      els.wallGroup.setAttribute("aria-valuetext", `u ${unitAndCm(u)}`);
+      els.sourceGroup.setAttribute("aria-valuemin", LIMITS.vMin);
+      els.sourceGroup.setAttribute("aria-valuemax", LIMITS.vMax);
+      els.sourceGroup.setAttribute("aria-valuenow", fmt(v));
+      els.sourceGroup.setAttribute("aria-valuetext", `v ${unitAndCm(v)}`);
+    }
+
+    function bindInput(input, range, setter) {
+      input.addEventListener("input", () => {
+        if (input.value === "" || input.value === "-" || input.value.endsWith(".")) return;
+        setter(Number(input.value));
+      });
+      input.addEventListener("change", () => setter(Number(input.value)));
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") input.blur();
+      });
+      range.addEventListener("input", () => setter(Number(range.value)));
+    }
+
+    function bindRange(range, setter) {
+      range.addEventListener("input", () => setter(Number(range.value)));
+    }
+
+    function onPointerDown(event) {
+      const target = event.target.closest("[data-drag]");
+      if (!target) return;
+      const dragType = target.dataset.drag;
+      if (dragType === "source" && state.mode !== "point") return;
+      state.activeDrag = dragType;
+      els.sceneWrap.classList.add("dragging");
+      target.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+
+    function onPointerMove(event) {
+      if (!state.activeDrag) return;
+      const point = svgPointFromEvent(event);
+      if (state.activeDrag === "wall") {
+        setU(-point.x);
+      } else if (state.activeDrag === "source") {
+        setV(point.x);
+      }
+    }
+
+    function onPointerUp(event) {
+      if (!state.activeDrag) return;
+      const target = event.target.closest("[data-drag]");
+      if (target && target.hasPointerCapture(event.pointerId)) {
+        target.releasePointerCapture(event.pointerId);
+      }
+      state.activeDrag = null;
+      els.sceneWrap.classList.remove("dragging");
+    }
+
+    function nudge(type, delta) {
+      if (type === "u") setU(state.u + delta);
+      if (type === "v") setV(state.v + delta);
+      if (type === "lens") setLens(state.lens + delta);
+      if (type === "focal") setF(currentFocal() + delta);
+    }
+
+    function reset() {
+      state.mode = "point";
+      state.u = 6;
+      state.v = 6;
+      state.lens = 10;
+      state.fixedF = 3;
+      state.fixedM = 2;
+      state.lock = null;
+      state.zoom = 1;
+      updateSceneView();
+      scheduleUrlSync();
+    }
+
+    bindInput(els.uInput, els.uRange, setU);
+    bindInput(els.vInput, els.vRange, setV);
+    bindInput(els.lensInput, els.lensRange, setLens);
+    bindInput(els.focalInput, els.focalRange, setF);
+    bindRange(els.mRange, setM);
+
+    for (const button of [els.pointMode, els.hudPointMode]) {
+      button.addEventListener("click", () => setMode("point"));
+    }
+    for (const button of [els.parallelMode, els.hudParallelMode]) {
+      button.addEventListener("click", () => setMode("parallel"));
+    }
+    for (const button of [els.lockU, els.lockV, els.lockF, els.lockM]) {
+      button.addEventListener("click", () => setLock(button.dataset.lock));
+    }
+    els.zoomOutButton.addEventListener("click", () => zoomBy(1 / 1.18));
+    els.zoomInButton.addEventListener("click", () => zoomBy(1.18));
+    els.zoomFitButton.addEventListener("click", () => setZoom(1));
+    els.collapseHud.addEventListener("click", () => {
+      const collapsed = els.hudPanel.classList.toggle("collapsed");
+      els.collapseHud.setAttribute("aria-expanded", String(!collapsed));
+      els.collapseHud.setAttribute("aria-label", collapsed ? "展开控制面板" : "折叠控制面板");
+      els.collapseHud.title = collapsed ? "展开控制面板" : "折叠控制面板";
+    });
+    els.resetButton.addEventListener("click", reset);
+
+    els.scene.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      zoomBy(event.deltaY < 0 ? 1.08 : 1 / 1.08);
+    }, { passive: false });
+
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-step]");
+      if (!button || button.disabled) return;
+      nudge(button.dataset.step, Number(button.dataset.delta));
+    });
+
+    els.scene.addEventListener("pointerdown", onPointerDown);
+    els.scene.addEventListener("pointermove", onPointerMove);
+    els.scene.addEventListener("pointerup", onPointerUp);
+    els.scene.addEventListener("pointercancel", onPointerUp);
+    els.wallGroup.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") setU(state.u + 0.1);
+      if (event.key === "ArrowRight") setU(state.u - 0.1);
+    });
+
+    els.sourceGroup.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") setV(state.v - 0.1);
+      if (event.key === "ArrowRight") setV(state.v + 0.1);
+    });
+
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(() => updateSceneView()).observe(els.sceneWrap);
+    } else {
+      window.addEventListener("resize", () => updateSceneView());
+    }
+    window.addEventListener("popstate", () => {
+      if (applyUrlState()) {
+        updateSceneView();
+      }
+    });
+    const hadUrlParams = applyUrlState();
+    updateSceneView();
+    if (hadUrlParams) writeUrlState();
+  </script>
+</body>
+</html>
