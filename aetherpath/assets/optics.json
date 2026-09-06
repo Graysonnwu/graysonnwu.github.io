@@ -1,0 +1,9 @@
+{
+  "kind": "GJE ray-derived compressed texture atlas",
+  "frames": 49,
+  "columns": 7,
+  "tile": 256,
+  "optical_resolution": 720,
+  "runtime_point_sets": false,
+  "display": "Density and mean surface gradients from stratified geometric OBJ/Snell rays. 0.6px reconstruction filter for display only; original OBJ and independent traces preserved."
+}
