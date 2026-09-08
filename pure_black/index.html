@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23000' d='M0 0h32v32H0z'/%3E%3C/svg%3E">
+  <title>Pure Black | 纯黑</title>
+  <style>
+    :root { color-scheme: dark; --cursor: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAJUlEQVR42u3NQQEAAAQEMPTvfErw2wqsk9SnqWcCgUAgEAgENxYLugMtU45VJgAAAABJRU5ErkJggg==") 12 12, auto; }
+    html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+    html::backdrop { background: #000; }
+    body { min-height: 100dvh; outline: none; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+    html, body, * { cursor: var(--cursor) !important; }
+  </style>
+</head>
+<body role="button" tabindex="0" aria-label="切换全屏">
+<script>
+(() => {
+  'use strict';
+  const root = document.documentElement;
+  const fullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const active = () => fullscreen() && document.visibilityState === 'visible';
+  let wake = null, pending = null, epoch = 0, busy = false;
+  let frames, idleTimer, animation = 0, opacity = 0, target = 0, lastCursor = '';
+
+  // Preserve the two approved icons; build and decode their alpha frames once.
+  const icons = ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABZ0lEQVR42r2VO07EQAyGvwxZtAoEUSBqKiSOQE+OwCVokOAAXIAKIa5BwRmogIoKKGiRoKNNYhobWZPHrAi7lkbOTCy//n88mYiwTMmjfQaEHrsW6MtkLWWbrbqCDeBQtZd74EsrtIxmQKUaPW+AJ+DDbHMXqAbOgVPgRc9aNTxxAczZHDgDSteaXeAdOPpNRkQQkVz1jYhc6vdfViUiD/odRKTTolozC64qy7gPrODAboBN1YMYWKl+jUnr2NeqcxkLMJ9ImllMEKOpsWNfz18jxqTEbHeAPeDRzpZ+D0LPPkzw15kEMQZTy5HUTf6PfslYiwpdU1hU9gWwSi50Dd2RIbGpWgG33nfspJzYnnVgewyD2o0J/68ZwCd3FRiD6tSD861G9QIZ15H+TLGoAY4V6Fz3GXAFvGmGNvgKxatQmwY40DZ1AtgEvNYKtuKpuODQewbuPF1X/mQOjYoUyPFFa1b26P8AmpCozJQ1UDoAAAAASUVORK5CYII=","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAABYklEQVR42s2VPUrFQBDHf7svkWceioVYa+MBbK2tbbyDYCFoI77GO9h6BcFT2IilhSjewPoJmmRsZmFZMsn6JOLAsJvZyc7Hf2bWiQhjks/QccrWWS8VGQZkybPsCCrllEpg7TcGQnRXykE20f0BcDd0T06KLC9XgI1lMJhEqwCtckot0KiejwBvY2y6DDTJugBWjQr6VL0mN4JSc1uqZzWwBzwbFbQDHGoEIcp74F0dkCLyRoApcK55F+Uv4LYj/AfgCZhHBh1wEhtwY3dykVm60tFUVofLEMi+B/gf6/5ZigLIlXZtFYX6AdwAb+pxkM+AM2ArSds18Boqy2eMkSPgOJIF+T5wmTsqJGqqi0RnYYyLGfAInBp3txbIRbTWwLoBcqsdXiSN1gxVUZ3sm563oFEdb8yrrGk6NeSlpqn/Oewp01BZu/r9EjWWAJvAtuLgrNfN/YdH3xt6Luf/0SP4BhzEYcFvUevKAAAAAElFTkSuQmCC"];
+  const loadImage = async (src) => {
+    const image = new Image();
+    image.src = src;
+    await image.decode();
+    return image;
+  };
+  Promise.all(icons.map(loadImage)).then(async (images) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 24;
+    const context = canvas.getContext('2d');
+    const result = images.map((image) => {
+      context.clearRect(0, 0, 24, 24);
+      context.drawImage(image, 0, 0);
+      const original = context.getImageData(0, 0, 24, 24).data;
+      return Array.from({ length: 25 }, (_, level) => {
+        const pixels = new ImageData(new Uint8ClampedArray(original), 24, 24);
+        for (let i = 3; i < pixels.data.length; i += 4) pixels.data[i] = Math.round(original[i] * level / 24);
+        context.putImageData(pixels, 0, 0);
+        return canvas.toDataURL();
+      });
+    });
+    await Promise.all(result.flat().map(loadImage));
+    frames = result;
+    if (document.visibilityState === 'visible') showCursor();
+  }).catch(console.warn);
+
+  function paintCursor() {
+    if (!frames) return;
+    const mode = Number(fullscreen()), level = Math.round(opacity * 24), key = mode + ':' + level;
+    if (key === lastCursor) return;
+    lastCursor = key;
+    root.style.setProperty('--cursor', `url("${frames[mode][level]}") 12 12, auto`);
+  }
+
+  function fade(to) {
+    if (!frames) return;
+    if (target === to && (animation || opacity === to)) return paintCursor();
+    target = to;
+    cancelAnimationFrame(animation);
+    const from = opacity, start = performance.now();
+    const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : (to ? 160 : 280) * Math.abs(to - from);
+    const step = (now) => {
+      const t = duration ? Math.min(1, (now - start) / duration) : 1;
+      opacity = from + (to - from) * t * t * (3 - 2 * t);
+      paintCursor();
+      animation = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    animation = requestAnimationFrame(step);
+  }
+
+  function showCursor() {
+    clearTimeout(idleTimer);
+    fade(1);
+    idleTimer = setTimeout(() => fade(0), 1500);
+  }
+
+  function hideCursor() {
+    clearTimeout(idleTimer);
+    cancelAnimationFrame(animation);
+    animation = opacity = target = 0;
+    paintCursor();
+  }
+
+  async function releaseWake() {
+    epoch++;
+    const previous = wake;
+    wake = null;
+    root.dataset.awake = 'false';
+    if (previous && !previous.released) await previous.release().catch(console.warn);
+  }
+
+  function acquireWake() {
+    if (!active() || (wake && !wake.released)) return;
+    if (pending) return pending;
+    const id = epoch;
+    pending = (async () => {
+      try {
+        const next = await navigator.wakeLock.request('screen');
+        if (!active() || id !== epoch) return await next.release();
+        wake = next;
+        root.dataset.awake = String(!next.released);
+        next.addEventListener('release', () => {
+          if (wake !== next) return;
+          wake = null;
+          root.dataset.awake = 'false';
+        });
+      } catch (error) {
+        root.dataset.awake = 'false';
+        console.warn('Wake Lock:', error);
+      }
+    })();
+    void pending.finally(() => { pending = null; });
+    return pending;
+  }
+
+  async function syncWake() {
+    if (!active()) return releaseWake();
+    if (pending) await pending;
+    return acquireWake();
+  }
+
+  async function exit() {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (document.webkitFullscreenElement) await document.webkitExitFullscreen();
+  }
+
+  async function toggle() {
+    if (busy) return;
+    busy = true;
+    try {
+      if (fullscreen()) await exit();
+      else await (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' });
+    } catch (error) { console.warn('Fullscreen:', error); }
+    finally { busy = false; void syncWake(); }
+  }
+
+  document.addEventListener('click', toggle);
+  document.addEventListener('keydown', (event) => {
+    if (event.repeat) return;
+    if (event.key === 'Escape') void exit().catch(console.warn);
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void toggle(); }
+  });
+  for (const event of ['fullscreenchange', 'webkitfullscreenchange']) {
+    document.addEventListener(event, () => { showCursor(); void syncWake(); });
+  }
+  document.addEventListener('pointermove', (event) => { if (event.pointerType !== 'touch') showCursor(); }, { passive: true });
+  document.addEventListener('pointerdown', showCursor, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    document.visibilityState === 'visible' ? showCursor() : hideCursor();
+    void syncWake();
+  });
+  window.addEventListener('pagehide', () => { hideCursor(); void releaseWake(); });
+  window.addEventListener('pageshow', () => { showCursor(); void syncWake(); });
+})();
+</script>
+</body>
+</html>
