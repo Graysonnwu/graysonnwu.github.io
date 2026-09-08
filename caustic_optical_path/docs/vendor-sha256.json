@@ -1,0 +1,12 @@
+{
+  "OrbitControls.js": "945656e2b17d682a8b0a27ab388976a338ef946b628aba381d32afc6afdaea00",
+  "TransformControls.js": "e86003ec7ae33e60160250ae48a31f55d49ddbf6062959695f62b22a71b3a574",
+  "mesh-bvh.LICENSE": "b106ef6198a9862ed2b5b873e944ecf3583c631a84a7462d400ecc1910ce7fee",
+  "mesh-bvh.js": "f7984346a9f7963f586e448127340d5932b76a89c33609e295ea3e9412587f2b",
+  "occt-import-js.js": "08e5badc9151dfb1c7229f617d3ef81ee34ace3f62816a983a12dad23461d7ea",
+  "occt-import-js.wasm": "33391fc9d94ea5c869a6718488bf0a9a464222bac9bdc764dfe1690cef281952",
+  "occt.LICENSE": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331",
+  "occt.README.md": "7bfa302f1974cd8b53f779ef93099ac21b0db9f65f3f3b2840ae26a710ac51f8",
+  "three.LICENSE.txt": "4c40a1ef62450b857c3b2aaf294936304cd552d965fbcd9d32d4c5bcf4ba4454",
+  "three.module.min.js": "0df47ee8b40daa94b4b49ab4e8d2e9061b74afe15eca66faeba02f359490d889"
+}
