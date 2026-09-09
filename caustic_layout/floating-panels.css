@@ -515,6 +515,7 @@ body {
   padding: 6px 10px;
   color: #adbdc5;
   font-size: 11px;
+  line-height: 16px;
   white-space: nowrap;
 }
 .camera-tools button[data-camera="side"] {
@@ -846,7 +847,7 @@ dialog::backdrop {
   }
   .preset {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
   .preset svg {
     width: 70px;
@@ -863,8 +864,8 @@ dialog::backdrop {
   left: 16px;
   right: 16px;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
-  grid-template-areas: ". camera ." "options metrics hint";
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "options camera hint" "options metrics hint";
   align-items: end;
   gap: 8px 12px;
   pointer-events: none;
@@ -905,6 +906,7 @@ dialog::backdrop {
 }
 .stage-bottom .metric strong {
   font-size: 13px;
+  line-height: 18px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -914,14 +916,17 @@ dialog::backdrop {
 }
 .stage-bottom .metric .label {
   margin-bottom: 3px;
+  line-height: 14px;
 }
 .stage-bottom > .statusbar {
   grid-area: options;
+  justify-self: start;
   pointer-events: auto;
   padding: 7px 10px;
 }
 .stage-bottom > .status-text {
   grid-area: hint;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -934,6 +939,7 @@ dialog::backdrop {
   backdrop-filter: blur(22px);
 }
 .stage-bottom .display-options {
+  flex-wrap: wrap;
   gap: 9px;
   font-size: 10px;
   white-space: nowrap;
@@ -943,6 +949,19 @@ dialog::backdrop {
   padding: 0;
   border: 0;
   font-size: 10px;
+}
+@media (min-width: 761px) and (max-width: 1050px) {
+  .stage-bottom {
+    grid-template-columns: 142px minmax(0, 1fr) 142px;
+  }
+  .stage-bottom > .metric-strip {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+  }
+  .stage-bottom .metric:nth-child(3n + 1) {
+    border-left: 0;
+    padding-left: 0;
+  }
 }
 .stage-assistance {
   flex: 1;

@@ -11,6 +11,7 @@ import {
   patternLayout,
   worldPoint,
   constrainedScale,
+  lightPivotPose,
   illuminationGuides,
 } from "./layout-geometry.js";
 import { axis, clone, degrees, direction, quaternion, vec } from "./optics.js";
@@ -83,6 +84,7 @@ export class OpticalScene {
     this.camera.up.set(-1, 0, 0);
     this.renderer = new T.WebGLRenderer({
       antialias: true,
+      stencil: true,
       powerPreference: "high-performance",
     });
     this.renderer.setPixelRatio(
@@ -90,6 +92,7 @@ export class OpticalScene {
     );
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
@@ -113,6 +116,8 @@ export class OpticalScene {
     if (isCompact()) this.gizmo.setSize(1.0);
     this.lensSpin = new T.Group();
     this.scene.add(this.lensSpin);
+    this.lightPivot = new T.Group();
+    this.scene.add(this.lightPivot);
     this.scene.add(this.gizmo);
     this.gizmo.addEventListener("change", () => this.request());
     this.gizmo.addEventListener("dragging-changed", (e) => {
@@ -124,6 +129,12 @@ export class OpticalScene {
       } else callbacks.end();
     });
     this.gizmo.addEventListener("objectChange", () => {
+      if (this.gizmo.object === this.lightPivot) {
+        const scale = constrainedScale(this.lightPivot.scale.toArray(), this.gizmo.axis, false, true)[0];
+        this.lightPivot.scale.setScalar(scale);
+        callbacks.transform("light", lightPivotPose(this.dragBase, degrees(this.lightPivot.quaternion), scale), this.dragBase);
+        return;
+      }
       if (this.gizmo.object === this.lensSpin) {
         const delta = quaternion(this.state.lens.rotation)
           .invert()
@@ -371,32 +382,29 @@ export class OpticalScene {
   attach() {
     const s = this.state;
     if (!s) return;
-    const meaningless =
-      this.selected === "light" &&
-      (this.mode === "scale" ||
-        (this.mode === "rotate" && s.light.type === "point"));
+    const lightPivot = this.selected === "light" && this.mode !== "translate";
     const spinOnly =
       this.selected === "lens" && s.lens.locked && this.mode === "rotate";
     if (
       !this.mode ||
-      (s[this.selected].locked && this.mode !== "scale" && !spinOnly) ||
-      meaningless
+      (s[this.selected].locked && (this.mode !== "scale" || this.selected === "light") && !spinOnly)
     )
       this.gizmo.detach();
     else
       this.gizmo.attach(
-        spinOnly && !this.model ? this.lensSpin : this.objects[this.selected],
+        lightPivot ? this.lightPivot : spinOnly && !this.model ? this.lensSpin : this.objects[this.selected],
       );
     if (this.mode) this.gizmo.setMode(this.mode);
     this.gizmo.setSpace(spinOnly ? "local" : this.space);
     this.gizmo.showX = this.gizmo.showY = !spinOnly;
-    this.gizmo.showZ = this.mode !== "scale";
+    this.gizmo.showZ = lightPivot || this.mode !== "scale";
     this.host.dataset.gizmoMode = this.mode || "";
     this.host.dataset.gizmoAxes = spinOnly
       ? "Z"
-      : this.mode === "scale"
+      : this.mode === "scale" && !lightPivot
         ? "XY"
         : "XYZ";
+    this.host.dataset.gizmoPivot = lightPivot ? "lens" : this.selected;
   }
   setMode(mode) {
     this.mode = mode;
@@ -430,13 +438,16 @@ export class OpticalScene {
     this.shadowData = shadowLayout(state, this.aperture);
     this.solidShadowData = solid;
     if (!this.dragging) {
+      this.lightPivot.position.fromArray(state.lens.position);
+      this.lightPivot.quaternion.copy(quaternion(state.light.rotation));
+      this.lightPivot.scale.setScalar(1);
       this.lensSpin.position.fromArray(state.lens.position);
       this.lensSpin.quaternion
         .copy(quaternion(state.lens.rotation))
         .multiply(quaternion([0, 0, state.lens.outlineRotation || 0]));
     }
     for (const [key, o] of Object.entries(this.objects)) {
-      if (this.dragging && key === this.selected) continue;
+      if (this.dragging && key === this.selected && this.gizmo.object !== this.lightPivot) continue;
       o.position.fromArray(state[key].position);
       o.quaternion.copy(quaternion(state[key].rotation));
       o.scale.set(1, 1, 1);
@@ -450,7 +461,7 @@ export class OpticalScene {
           .sub(vec(t.position))
           .dot(axis(t, 2)),
       ) || 1;
-    const lensKey = JSON.stringify([
+    const lensKey = this.model ? JSON.stringify([this.model.revision, state.reflect, l.n]) : JSON.stringify([
       state.reflect,
       l.shape,
       l.width,
@@ -641,7 +652,15 @@ export class OpticalScene {
       this.targetTexture.needsUpdate = true;
     }
     const blur = sourceBlur(state);
-    if (this.targetImage) this.targetImage.position.z = receiverSide * 0.12;
+    if (this.targetImage) {
+      this.targetImage.position.z = receiverSide * 0.12;
+      Object.assign(this.targetImage.material, {
+        stencilWrite: Boolean(this.dragging && t.clipToShadow && !state.reflect && !state.view.sourceBlur),
+        stencilRef: 1,
+        stencilFunc: T.EqualStencilFunc,
+        stencilWriteMask: 0,
+      });
+    }
     if (this.traceImage) this.traceImage.position.z = receiverSide * 0.16;
     updateSourceBlur(
       this.targetImage?.material,
@@ -712,6 +731,14 @@ export class OpticalScene {
     camera.right = camera.top = range;
     camera.far = Math.max(10000, range * 10);
     camera.updateProjectionMatrix();
+    const castKey = JSON.stringify([
+      lensKey, l.position, l.rotation, l.width, l.height, l.thickness,
+      light.type, light.position, light.rotation, range,
+    ]);
+    if (castKey !== this.castKey) {
+      this.castKey = castKey;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     const boardCorners = corners(
       t.height * t.boardFactor,
       t.width * t.boardFactor,
@@ -746,19 +773,25 @@ export class OpticalScene {
     return pixels;
   }
   updateShadow() {
-    dispose(this.shadow);
     this.shadow.visible = this.state.view.shadow;
     const data = this.solidShadowData;
+    // Selection, exposure and camera controls do not change the solid shadow.
+    // Keep its GPU buffer instead of uploading millions of vertices again.
+    if (this.renderedShadow === data) return;
+    this.renderedShadow = data;
     this.host.dataset.shadowSurface = data?.actualModel
       ? "model-solid"
       : "extruded-solid";
     this.host.dataset.shadowTriangles = String(
-      (data?.positions.length || 0) / 9,
+      data?.indices ? data.indices.length / 3 : (data?.positions.length || 0) / 9,
     );
     this.host.dataset.shadowBounds = data
       ? JSON.stringify([data.min, data.max])
       : "";
-    if (!data?.positions.length || !this.state.view.shadow) return;
+    if (!data?.positions.length) {
+      dispose(this.shadow);
+      return;
+    }
     const t = this.state.target,
       clip = [axis(t, 0), axis(t, 1)];
     const clippingPlanes = [];
@@ -771,17 +804,28 @@ export class OpticalScene {
         );
       }
     this.renderer.localClippingEnabled = true;
-    const material = new T.MeshBasicMaterial({
-      color: 0x050809,
-      side: T.DoubleSide,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      clippingPlanes,
-    });
-    const geometry = new T.BufferGeometry();
-    geometry.setAttribute("position", new T.BufferAttribute(data.positions, 3));
-    const mesh = new T.Mesh(geometry, material);
+    let mesh = this.shadow.children[0];
+    if (mesh?.geometry.index?.array === data.indices &&
+        mesh?.geometry.attributes.position.array.length === data.positions.length) {
+      mesh.geometry.attributes.position.array = data.positions;
+      mesh.geometry.attributes.position.needsUpdate = true;
+      mesh.material.clippingPlanes = clippingPlanes;
+    } else {
+      dispose(this.shadow);
+      const material = new T.MeshBasicMaterial({
+        color: 0x050809, side: T.DoubleSide, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -1, clippingPlanes,
+        stencilWrite: true, stencilRef: 1, stencilFunc: T.AlwaysStencilFunc,
+        stencilZPass: T.ReplaceStencilOp,
+      });
+      const geometry = new T.BufferGeometry();
+      geometry.setAttribute("position", new T.BufferAttribute(data.positions, 3).setUsage(T.DynamicDrawUsage));
+      if (data.indices) geometry.setIndex(new T.BufferAttribute(data.indices, 1));
+      mesh = new T.Mesh(geometry, material);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 1;
+      this.shadow.add(mesh);
+    }
     const shadowSide =
       Math.sign(
         (this.state.light.type === "point"
@@ -791,8 +835,6 @@ export class OpticalScene {
       ) || 1;
     mesh.position.copy(worldPoint(t, [0, 0, shadowSide * 0.035]));
     mesh.quaternion.copy(quaternion(t.rotation));
-    mesh.renderOrder = 1;
-    this.shadow.add(mesh);
   }
   updateRays() {
     dispose(this.rays);
@@ -843,12 +885,18 @@ export class OpticalScene {
       : "straight-shadow";
   }
   updateLensDimensions() {
-    dispose(this.lensDimensions);
-    this.lensMeasureAnchors = {};
     const object = this.objects.lens,
       mesh = object.children.find((o) => o.isMesh);
     if (!mesh) return;
-    mesh.geometry.computeBoundingBox();
+    this.lensDimensions.position.copy(object.position);
+    this.lensDimensions.quaternion.copy(object.quaternion);
+    this.lensDimensions.scale.copy(object.scale);
+    const key = `${mesh.geometry.id}:${object.scale.toArray()}`;
+    if (this.lensDimensionKey === key) return;
+    this.lensDimensionKey = key;
+    dispose(this.lensDimensions);
+    this.lensMeasureAnchors = {};
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     const box = mesh.geometry.boundingBox;
     if (!box || box.isEmpty()) return;
     const { min, max } = box,

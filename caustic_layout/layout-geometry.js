@@ -415,6 +415,18 @@ export function constrainedScale(
   return scales;
 }
 
+// Orbit the source around the lens; scaling changes distance, not emitter size.
+export function lightPivotPose(base, rotation, scale = 1) {
+  const center = vec(base.lens.position);
+  const delta = quaternion(rotation).multiply(quaternion(base.light.rotation).invert());
+  return {
+    position: vec(base.light.position).sub(center).applyQuaternion(delta)
+      .multiplyScalar(scale).add(center).toArray(),
+    rotation,
+    scale: [1, 1, 1],
+  };
+}
+
 export function modelIntersectsReceiver(s, model) {
   const q = quaternion(s.lens.rotation).invert(),
     normal = axis(s.target, 2).applyQuaternion(q);
@@ -423,10 +435,15 @@ export function modelIntersectsReceiver(s, model) {
     p = model.positions,
     scale = model.scale || 1;
   const distance = new Float64Array(p.length / 3);
-  for (let i = 0; i < p.length; i += 3)
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
     distance[i / 3] =
       (normal.x * p[i] + normal.y * p[i + 1] + normal.z * p[i + 2]) * scale +
       constant;
+    min = Math.min(min, distance[i / 3]);
+    max = Math.max(max, distance[i / 3]);
+  }
+  if (min > 0.001 || max < -0.001) return false;
   for (let i = 0; i < model.indices.length; i += 3) {
     const a = distance[model.indices[i]],
       b = distance[model.indices[i + 1]],

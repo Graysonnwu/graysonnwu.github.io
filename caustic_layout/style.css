@@ -235,13 +235,14 @@ svg {
 .preset {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
   padding: 11px 10px;
   background: #1c232b;
   border: 1px solid #313943;
   border-radius: 7px;
-  text-align: left;
+  text-align: center;
   font-size: 12px;
 }
 .preset svg {
@@ -884,62 +885,6 @@ dialog::backdrop {
   color: #96a6af;
   margin-top: 8px;
 }
-.warp-dialog {
-  width: 660px;
-}
-.warp-editor {
-  position: relative;
-  margin: 25px;
-  background: #0c1116;
-  border: 1px solid #43524f;
-  touch-action: none;
-  aspect-ratio: 1;
-}
-.warp-editor canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-#warpHandles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.warp-handle {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 2px solid #b6fce1;
-  background: #426e5c;
-  border-radius: 4px;
-  transform: translate(-50%, -50%);
-  cursor: move;
-  pointer-events: auto;
-  touch-action: none;
-}
-.warp-handle:before {
-  content: attr(data-label);
-  position: absolute;
-  top: -25px;
-  left: -9px;
-  white-space: nowrap;
-  font-size: 11px;
-  color: #a1b9b1;
-}
-.warp-footer {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 12px;
-}
-.warp-footer button {
-  font-size: 12px;
-  padding: 8px 12px;
-}
-.warp-footer .primary-button {
-  margin-left: auto;
-}
 .help-dialog {
   width: 570px;
   line-height: 1.9;
@@ -1182,15 +1127,6 @@ dialog::backdrop {
   }
   .metric-strip {
     max-width: 590px;
-  }
-  .warp-dialog {
-    padding: 15px;
-  }
-  .warp-editor {
-    margin: 22px 10px;
-  }
-  .warp-footer {
-    flex-wrap: wrap;
   }
   .dialog-heading p {
     font-size: 11px;
@@ -1533,10 +1469,6 @@ dialog::backdrop {
 .inspector-action button {
   width: 100%;
   font-size: 12px;
-}
-.warp-shortcut {
-  display: block;
-  margin: 0 0 10px auto;
 }
 .history-tools {
   display: flex;

@@ -1,4 +1,6 @@
 import { guangGlyph } from "./demo-glyph.js";
+import { triangleMask } from "./mesh-raster.js";
+import { adjustPixels } from "./image-adjustments.js";
 import {
   imageEnergyMoments,
   imageEnergySamples,
@@ -14,8 +16,10 @@ export function canvas(width = 512, height = width) {
   return c;
 }
 export function demoTarget() {
+  // Rasterize the vector once; GPU canvas replay can change antialiasing after
+  // histogram readback and make an otherwise identical Undo change pixels.
   const c = canvas(800),
-    x = c.getContext("2d");
+    x = c.getContext("2d", { willReadFrequently: true });
   x.fillStyle = "#000";
   x.fillRect(0, 0, 800, 800);
   x.fillStyle = "#fff";
@@ -103,6 +107,14 @@ export function cropMask(input) {
     c.width,
     c.height,
   );
+  return c;
+}
+export function padSquare(input) {
+  if (input.width === input.height) return input;
+  const size = Math.max(input.width, input.height), c = canvas(size), x = c.getContext("2d");
+  x.fillStyle = "black";
+  x.fillRect(0, 0, size, size);
+  x.drawImage(input, Math.floor((size-input.width)/2), Math.floor((size-input.height)/2));
   return c;
 }
 export function sourceCanvas(state, custom, size = 700) {
@@ -269,18 +281,9 @@ export function shadowMask(target, shadow, size = 700) {
     x.fill(path, "evenodd");
     return c;
   }
-  for (let i = 0; i < p.length; i += 9) {
-    for (let k = 0; k < 3; k++) {
-      const j = i + k * 3;
-      path[k ? "lineTo" : "moveTo"](
-        (p[j + 1] / target.width + 0.5) * size,
-        (p[j] / target.height + 0.5) * size,
-      );
-    }
-    path.closePath();
-  }
-  x.fillStyle = "white";
-  x.fill(path, "nonzero");
+  x.putImageData(new ImageData(
+    triangleMask(p, shadow.indices, size, size, target.height, target.width), size, size,
+  ), 0, 0);
   return c;
 }
 
@@ -292,7 +295,7 @@ export function targetCanvas(original, target, size = 700, shadow = null) {
   ctx.translate(size / 2, size / 2);
   ctx.rotate((target.imageRotation * Math.PI) / 180);
   ctx.drawImage(original, -size / 2, -size / 2, size, size);
-  const src = ctx.getImageData(0, 0, size, size).data,
+  const src = adjustPixels(ctx.getImageData(0, 0, size, size).data, target.imageAdjustments),
     c = canvas(size),
     x = c.getContext("2d"),
     out = x.createImageData(size, size),
@@ -347,6 +350,23 @@ export function targetCanvas(original, target, size = 700, shadow = null) {
   c.energy = energy;
   c.energyMoments = imageEnergyMoments(out.data, size, size);
   c.reliefSamples = imageEnergySamples(out.data, size, size, 16);
+  return c;
+}
+// Layout changes only move the shadow; reuse the adjusted, warped artwork.
+export function clipTargetCanvas(artwork, target, shadow, size = 700) {
+  const c = canvas(size), x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(artwork, 0, 0, size, size);
+  const pixels = x.getImageData(0, 0, size, size),
+    mask = shadowMask(target, shadow, size).getContext("2d").getImageData(0, 0, size, size).data;
+  let energy = 0;
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    for (let k = 0; k < 3; k++) pixels.data[i+k] *= mask[i+3] / 255;
+    energy += .299*pixels.data[i] + .587*pixels.data[i+1] + .114*pixels.data[i+2];
+  }
+  x.putImageData(pixels, 0, 0);
+  c.energy = energy;
+  c.energyMoments = imageEnergyMoments(pixels.data, size, size);
+  c.reliefSamples = imageEnergySamples(pixels.data, size, size, 16);
   return c;
 }
 export function imageAsset(c, name) {

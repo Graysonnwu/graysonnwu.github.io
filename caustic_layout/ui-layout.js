@@ -111,6 +111,16 @@ export function revealInspector() {
   panel("right");
   document.getElementById("rightPanel").hidden = false;
 }
+export function resetLayout() {
+  closeMobilePanels();
+  preferences.left = preferences.right = false;
+  preferences.sections = { presets: false, outline: false, target: true, model: false };
+  for (const side of ["left", "right"]) panel(side);
+  document.querySelectorAll("details[data-section]").forEach(d => {
+    d.open = preferences.sections[d.dataset.section] ?? true;
+  });
+  save();
+}
 export function initializeLayout() {
   for (const side of ["left", "right"]) panel(side);
   document.querySelectorAll("details[data-section]").forEach((d) => {

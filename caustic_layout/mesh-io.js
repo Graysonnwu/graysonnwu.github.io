@@ -3,7 +3,9 @@
 export function parseOBJ(text) {
   const vertices = [],
     faces = [];
-  for (const line of text.split(/\r?\n/)) {
+  // Iterate lines without retaining a second array of every line in a large OBJ.
+  for (const match of text.matchAll(/[^\r\n]+/g)) {
+    const line = match[0];
     const words = line.trim().split(/\s+/),
       kind = words.shift();
     if (kind === "v") {

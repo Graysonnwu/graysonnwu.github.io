@@ -1,0 +1,45 @@
+.image-tools { display: flex; justify-content: flex-end; gap: 14px; margin-bottom: 12px; }
+.image-editor-dialog { width: min(780px, calc(100vw - 24px)); max-height: calc(100dvh - 28px); padding: 20px; overflow: auto; border: 1px solid var(--glass-edge); border-radius: 14px; background: #202a30ed; backdrop-filter: blur(24px); color: #d4e1e4; }
+.image-editor-dialog::backdrop { background: #050a11a8; backdrop-filter: blur(5px); }
+.image-editor-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 24px; }
+#imageEditPreview { display: block; width: 100%; aspect-ratio: 1; border-radius: 7px; background: black; }
+.image-preview-panel { min-width: 0; }
+.image-preview-wrap { position: relative; margin: 14px; }
+#imageEditHandles { position: absolute; inset: 0; pointer-events: none; }
+.image-corner { position: absolute; width: 30px; height: 30px; min-height: 0; padding: 0; transform: translate(-50%, -50%); border: 0; background: transparent; cursor: move; pointer-events: auto; touch-action: none; }
+.image-corner::after { content: ""; position: absolute; inset: 9px; background: #294f43; border: 2px solid #b1e8d2; border-radius: 3px; }
+.image-corner:focus-visible { outline: 2px solid #94d9be; border-radius: 6px; }
+.image-transform-tools { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.image-transform-tools button, .image-transform-tools label { font-size: 11px; white-space: nowrap; }
+.image-transform-tools .quiet-button { padding: 7px 10px; }
+.image-transform-tools label { display: flex; align-items: center; gap: 5px; }
+#resetImageCorners { margin-left: auto; }
+.image-preview-panel .help-text { margin: 12px 0 0; font-size: 11px; }
+.image-adjust-controls { min-width: 0; }
+.image-mode { display: grid; gap: 10px; margin-bottom: 16px; }
+.image-mode label { display: flex; gap: 10px; align-items: center; font-size: 12px; }
+.image-mode select { margin-left: auto; min-width: 105px; }
+.image-editor-dialog select, .image-editor-dialog input[type=number] { color: #d4e1e4; background: #121e2580; border: 1px solid #8aa2af40; border-radius: 5px; padding: 6px 8px; }
+.image-editor-dialog select { appearance: none; padding-right: 25px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23a6b9ba' stroke-width='1.4'/%3E%3C/svg%3E"); background-size: 16px; background-position: right 5px center; background-repeat: no-repeat; }
+.image-editor-dialog option { background: #202a30; }
+#thresholdLabel[hidden] { display: none; }
+#imageThreshold { min-width: 0; flex: 1; accent-color: #98d6bf; }
+#thresholdValue { min-width: 24px; font-variant-numeric: tabular-nums; }
+.curve-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; font-size: 11px; }
+#imageCurve { display: block; width: 100%; aspect-ratio: 1; border: 1px solid #b3cbd332; border-radius: 6px; cursor: crosshair; touch-action: none; }
+#imageCurve:focus-visible { outline: 2px solid #94d9be; outline-offset: 2px; }
+.image-adjust-controls .help-text { margin: 8px 0; font-size: 11px; }
+.curve-coordinates { display: flex; gap: 10px; align-items: center; }
+.curve-coordinates label { display: flex; gap: 5px; align-items: center; font-size: 11px; }
+.curve-coordinates input { width: 52px; min-width: 0; padding: 5px !important; }
+.curve-coordinates button { margin-left: auto; font-size: 10px; }
+.image-editor-footer { display: flex; gap: 9px; margin-top: 20px; }
+.image-editor-footer span { flex: 1; }
+.image-editor-footer button { padding: 8px 12px; }
+@media (max-width: 600px) {
+  .image-editor-dialog { padding: 14px; }
+  .image-editor-grid { grid-template-columns: 1fr; gap: 16px; }
+  .image-preview-wrap { width: min(calc(100% - 28px), 230px); margin: 14px auto; }
+  #imageCurve { width: min(100%, 240px); margin: auto; }
+  .image-editor-footer { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 12px 14px; background: #202a30; border-top: 1px solid #b3cbd322; }
+}

@@ -1,5 +1,7 @@
 import * as T from "./vendor/three.module.min.js";
 import { initializeI18n, language } from "./i18n.js";
+import { installImageEditor } from "./image-editor.js";
+import { defaultAdjustments } from "./image-adjustments.js";
 import {
   PRESETS,
   SHAPES,
@@ -15,16 +17,17 @@ import {
   syncLensDimensions,
   relativeSetup,
   aimRotation,
-  validQuad,
 } from "./optics.js";
 import {
   canvas,
   demoTarget,
   decodeImage,
   cropMask,
+  padSquare,
   maskContours,
   sourceCanvas,
   targetCanvas,
+  clipTargetCanvas,
   imageAsset,
 } from "./images.js";
 import { OpticalScene } from "./scene.js";
@@ -35,12 +38,14 @@ import {
 } from "./relief-estimate.js";
 import { reliefInput } from "./relief-input.js";
 import { alignEntrance } from "./mesh-io.js";
+import { triangleMask } from "./mesh-raster.js";
 import {
   moduleBlock,
   initializeLayout,
   revealInspector,
   icon,
   closeMobilePanels,
+  resetLayout,
 } from "./ui-layout.js";
 import {
   projectFilename,
@@ -60,6 +65,7 @@ import {
   shadowLayout,
   matchTargetToShadow,
   constrainedScale,
+  lightPivotPose,
   modelIntersectsReceiver,
   worldPoint,
   quaternion,
@@ -80,8 +86,10 @@ let state = defaultState(),
   target,
   revision = 0;
 let selectionActive = false;
+let projectEpoch = 0;
 let solidKey = "",
   solidData = null;
+let artwork = null, artworkOriginal = null, artworkKey = "";
 let selected = "target",
   scene,
   model = null,
@@ -99,7 +107,8 @@ let selected = "target",
   intersectionKey = "",
   intersection = false,
   sourceThumbRevision = -1,
-  targetThumbRevision = -1;
+  targetThumbRevision = -1,
+  inspectorRenderedAt = 0;
 let reliefKey = "",
   reliefResult = null,
   reliefStatus = "pending",
@@ -242,13 +251,20 @@ function getSolidShadow() {
 function getPatternBoundary() {
   return state.reflect ? shadowLayout(state) : getSolidShadow();
 }
-function bakeTarget() {
-  target = targetCanvas(
-    targetOriginal,
+function bakeTarget(size = 700) {
+  const key = JSON.stringify([state.target.corners, state.target.imageRotation, state.target.invert, state.target.imageAdjustments]);
+  if (artworkOriginal !== targetOriginal || artworkKey !== key) {
+    artwork = targetCanvas(targetOriginal, {...state.target, clipToShadow: false});
+    artwork.revision = ++revision;
+    artworkOriginal = targetOriginal;
+    artworkKey = key;
+  }
+  target = state.target.clipToShadow ? clipTargetCanvas(
+    artwork,
     state.target,
-    700,
-    state.target.clipToShadow ? getPatternBoundary() : null,
-  );
+    getPatternBoundary(),
+    size,
+  ) : artwork;
   target.revision = ++revision;
 }
 function bake() {
@@ -302,6 +318,8 @@ function restore(entry) {
   scene.setModel(model);
   if (changedModel) syncMesh();
   render();
+  if (entry.camera) scene.restoreCamera(entry.camera);
+  if (entry.traceQuality) $("traceQuality").value = entry.traceQuality;
   scheduleSave();
 }
 function undo() {
@@ -313,6 +331,47 @@ function redo() {
   if (!redoStack.length) return;
   undoStack.push(snapshot());
   restore(redoStack.pop());
+}
+function newProject() {
+  const previous = { ...snapshot(), camera: scene.captureCamera(), traceQuality: $("traceQuality").value };
+  projectEpoch++;
+  importID++;
+  reliefID++;
+  modelWorker?.terminate();
+  traceWorker?.terminate();
+  reliefWorker?.terminate();
+  modelWorker = traceWorker = reliefWorker = null;
+  clearTimeout(reliefTimer);
+  clearTimeout(reliefTimeout);
+  workerReady = false;
+  reliefKey = "";
+  reliefResult = null;
+  preparedProject = null;
+  preparingExport = false;
+  $("uploadModel").disabled = false;
+  $("modelUnit").value = "auto";
+  $("traceQuality").value = "standard";
+  change(() => {
+    state = defaultState();
+    if (language() === "en") state.title = "My project";
+    sourceOriginal = sourceUpload = targetUpload = null;
+    sourceName = "";
+    targetOriginal = demoTarget();
+    targetName = "示例 · 光";
+    model = null;
+    scene.setModel(null);
+    scene.setRelief(null);
+  }, { images: true, history: false });
+  undoStack.splice(0, undoStack.length, previous);
+  redoStack.length = 0;
+  clearSelection();
+  resetLayout();
+  $("sceneAssessment").open = false;
+  scene.setSpace("world");
+  $("spaceToggle").textContent = "世界";
+  render();
+  scene.fit();
+  toast("已新建项目，可撤销恢复。");
 }
 function scheduleSave() {
   if (TEST_MODE) return;
@@ -359,6 +418,9 @@ function setTool(mode) {
   document.querySelectorAll("[data-tool]").forEach((b) => {
     b.classList.toggle("active", b.dataset.tool === mode);
     b.setAttribute("aria-pressed", String(b.dataset.tool === mode));
+    b.title = selected === "light" && b.dataset.tool !== "translate"
+      ? (b.dataset.tool === "rotate" ? "绕透镜中心旋转" : "调节光源距离")
+      : { translate: "平移 W", rotate: "旋转 E", scale: "缩放 R" }[b.dataset.tool];
   });
 }
 function clearSelection() {
@@ -394,10 +456,7 @@ function selection(key) {
     .querySelectorAll("[data-tool]")
     .forEach(
       (b) =>
-        (b.disabled =
-          key === "light" &&
-          (b.dataset.tool === "scale" ||
-            (b.dataset.tool === "rotate" && state.light.type === "point"))),
+        (b.disabled = key === "light" && state.light.locked),
     );
 }
 function escaped(value) {
@@ -410,8 +469,12 @@ function escaped(value) {
   );
 }
 
-const presetIcon = (p) =>
-  `<svg viewBox="0 0 86 34" aria-hidden="true"><path d="M35 5v24M${p.oblique ? "70 8v24" : "69 3v28"}" stroke-width="3"/><path d="${p.point ? (p.oblique ? "M7 4 35 12 69 18M7 4 35 24 69 29" : "M7 17 35 8 68 4M7 17 35 26 68 30") : p.oblique ? "M6 2 35 12 69 18M6 14 35 24 69 29" : "M7 8h28l33 -4M7 26h28l33 4"}" opacity=".65"/>${p.point ? '<circle cx="7" cy="' + (p.oblique ? 4 : 17) + '" r="2.4" fill="currentColor"/>' : ""}</svg>`;
+const presetIcon = (p) => {
+  const parts = p.oblique
+    ? `<path d="M45 18v27M51 53h49" stroke-width="3"/><path d="${p.point ? "M17 5 81 53M17 5 55.4 53" : "M14 3 64 53M24 3 74 53"}" opacity=".65"/>${p.point ? '<circle cx="17" cy="5" r="2.4" fill="currentColor"/>' : ""}`
+    : `<path d="M49 13v32M96 7v44" stroke-width="3"/><path d="${p.point ? "M14 29 49 17 95 8M14 29 49 41 95 50" : "M14 17h35l46 -9M14 41h35l46 9"}" opacity=".65"/>${p.point ? '<circle cx="14" cy="29" r="2.4" fill="currentColor"/>' : ""}`;
+  return `<svg viewBox="0 0 112 58" aria-hidden="true">${parts}</svg>`;
+};
 const shapeIcons = {
   circle: '<circle cx="12" cy="12" r="8"/>',
   square: '<rect x="4" y="4" width="16" height="16"/>',
@@ -515,8 +578,9 @@ function renderInspector() {
   html += vectorFields("position", "位置", "mm");
   if (selected === "lens" && locked)
     html += moduleBlock("lens-spin", "面内旋转", spinFields());
-  else if (!(selected === "light" && o.type === "point"))
-    html += vectorFields("rotation", "旋转", "°");
+  else html += vectorFields("rotation", selected === "light" ? "绕透镜中心旋转" : "旋转", "°");
+  if (selected === "light")
+    html += `<p class="help-text">旋转绕透镜中心，缩放调节灯距。</p>`;
   if (selected === "light" && o.type === "parallel")
     html += `<div class="inspector-action"><button id="aimLight" class="quiet-button" ${locked ? "disabled" : ""}>朝向透镜中心</button></div>`;
   if (selected === "lens") {
@@ -550,7 +614,7 @@ function renderInspector() {
     html += moduleBlock(
       "target-size",
       "投影图尺寸",
-      `<div class="size-fields">${field("target.width", "宽 · mm", o.width, { min: 0.1, step: 5 })}${field("target.height", "高 · mm", o.height, { min: 0.1, step: 5 })}</div><label class="checkbox-line"><input type="checkbox" data-path="target.keepAspect" ${o.keepAspect ? "checked" : ""}>保持宽高比</label><button id="editWarpInspector" class="quiet-button">编辑图案四角</button>`,
+      `<div class="size-fields">${field("target.width", "宽 · mm", o.width, { min: 0.1, step: 5 })}${field("target.height", "高 · mm", o.height, { min: 0.1, step: 5 })}</div><label class="checkbox-line"><input type="checkbox" data-path="target.keepAspect" ${o.keepAspect ? "checked" : ""}>保持宽高比</label><button id="editImageInspector" class="quiet-button">调整图像</button>`,
     );
     html += moduleBlock(
       "target-receiver",
@@ -694,15 +758,17 @@ function assessment(sourceImage = source, targetImage = target) {
 
 function render() {
   requestRelief();
-  scene?.update(state, source, target, getSolidShadow());
+  const stencilCrop = scene?.dragging && state.target.clipToShadow && !state.reflect && !state.view.sourceBlur;
+  scene?.update(state, source, stencilCrop ? artwork : target, getSolidShadow());
+  const now = performance.now();
+  if (scene?.dragging && now - inspectorRenderedAt < 100) return;
+  inspectorRenderedAt = now;
   renderInspector();
   renderOutlineFields();
   document.querySelectorAll("[data-tool]").forEach((b) => {
     b.disabled =
       !selectionActive ||
-      (selected === "light" &&
-        (b.dataset.tool === "scale" ||
-          (b.dataset.tool === "rotate" && state.light.type === "point")));
+      (selected === "light" && state.light.locked);
   });
   for (const b of document.querySelectorAll("[data-preset]")) {
     const active = b.dataset.preset === state.preset;
@@ -970,6 +1036,10 @@ function applyField(path, value) {
   change(
     () => {
       setPath(path, value);
+      if (path.startsWith("light.rotation."))
+        state.light.position = lightPivotPose(before, state.light.rotation).position;
+      if (path.startsWith("light.position.") && state.light.type === "point")
+        state.light.rotation = aimRotation(state.light.position, state.lens.position);
       if (path === "lens.thickness") state.lens.thicknessAuto = false;
       state.preset = "custom";
       const [obj, property] = path.split(".");
@@ -1007,6 +1077,13 @@ function applyField(path, value) {
 }
 
 function wire() {
+  const openImageEditor = installImageEditor({
+    getImage: () => targetOriginal,
+    getTarget: () => state.target,
+    getShadow: () => getPatternBoundary(),
+    onApply: edits => change(() => Object.assign(state.target, edits), {images: true}),
+  });
+  $("imageEdit").onclick = openImageEditor;
   document.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
@@ -1092,7 +1169,7 @@ function wire() {
         );
         state.preset = "custom";
       });
-    if (b.id === "editWarpInspector") openWarp();
+    if (b.id === "editImageInspector") openImageEditor();
   });
   const fieldChanged = (e) => {
     const input = e.target;
@@ -1235,6 +1312,7 @@ function wire() {
   );
   $("undo").onclick = undo;
   $("redo").onclick = redo;
+  $("newProject").onclick = newProject;
   $("fit").onclick = () => scene.fit();
   $("help").onclick = () => $("helpDialog").showModal();
   document.addEventListener("pointerdown", (e) => {
@@ -1312,6 +1390,7 @@ function wire() {
         ];
         state.target.imageRotation = 0;
         state.target.invert = false;
+        state.target.imageAdjustments = defaultAdjustments();
       },
       { images: true },
     );
@@ -1371,14 +1450,15 @@ function wire() {
     else if (/\.(json|zip)$/i.test(f.name)) importSetup(f);
     else uploadTarget(f);
   });
-  wireWarp();
 }
 
 async function uploadSource(file) {
+  const epoch = projectEpoch;
   try {
     if (model) throw new Error("请先移除实际模型，再更换轮廓");
     const image = cropMask(await decodeImage(file)),
       contours = maskContours(image);
+    if (epoch !== projectEpoch) return;
     change(
       () => {
         sourceOriginal = image;
@@ -1397,12 +1477,14 @@ async function uploadSource(file) {
     );
     toast("轮廓已更新");
   } catch (e) {
-    error(e);
+    if (epoch === projectEpoch) error(e);
   }
 }
 async function uploadTarget(file) {
+  const epoch = projectEpoch;
   try {
-    const image = await decodeImage(file);
+    const image = padSquare(await decodeImage(file));
+    if (epoch !== projectEpoch) return;
     change(
       () => {
         targetOriginal = image;
@@ -1416,17 +1498,15 @@ async function uploadTarget(file) {
         ];
         state.target.imageRotation = 0;
         state.target.invert = false;
+        state.target.imageAdjustments = defaultAdjustments();
         const long = Math.max(state.target.width, state.target.height);
-        state.target.width =
-          (long * image.width) / Math.max(image.width, image.height);
-        state.target.height =
-          (long * image.height) / Math.max(image.width, image.height);
+        state.target.width = state.target.height = long;
       },
       { images: true },
     );
     toast("投影图已更新，可拖动四角调整形状");
   } catch (e) {
-    error(e);
+    if (epoch === projectEpoch) error(e);
   }
 }
 function download(blob, name) {
@@ -1499,6 +1579,7 @@ let preparedProject = null,
   preparingExport = false;
 async function exportProject() {
   if (preparingExport) return;
+  const epoch = projectEpoch;
   try {
     preparingExport = true;
     preparedProject = null;
@@ -1509,6 +1590,7 @@ async function exportProject() {
     closeMobilePanels();
     $("exportDialog").showModal();
     const packet = exportPacket({ project: true });
+    scheduleSave();
     if (model) packet.model_reference.geometry_included = true;
     const exportTitle = state.title,
       blob = await makeProjectPackage(
@@ -1524,6 +1606,7 @@ async function exportProject() {
           traceQuality: $("traceQuality").value,
         },
       );
+    if (epoch !== projectEpoch) return;
     preparedProject = new File([blob], projectFilename(exportTitle), {
       type: "application/zip",
     });
@@ -1537,17 +1620,21 @@ async function exportProject() {
       ? "可在系统分享菜单中选择微信等应用。"
       : "此浏览器不支持文件分享，请先保存再转发。";
   } catch (e) {
+    if (epoch !== projectEpoch) return;
     $("projectFileInfo").removeAttribute("data-user-content");
     $("projectFileInfo").textContent = "项目未能生成";
     $("projectDeliveryStatus").textContent = e.message;
     error(e);
   } finally {
-    preparingExport = false;
-    render();
+    if (epoch === projectEpoch) {
+      preparingExport = false;
+      render();
+    }
   }
 }
 
 async function importSetup(file) {
+  const epoch = projectEpoch;
   try {
     const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     const zipped =
@@ -1564,6 +1651,7 @@ async function importSetup(file) {
       mask = assets.source_original
         ? await decodeImage(assets.source_original.data_url)
         : cropMask(await decodeImage(assets.source.data_url));
+    if (epoch !== projectEpoch) return;
     // A pending mesh import must not overwrite the scene from this JSON.
     importID++;
     modelWorker?.terminate();
@@ -1595,6 +1683,7 @@ async function importSetup(file) {
           ];
           state.target.imageRotation = 0;
           state.target.invert = false;
+          state.target.imageAdjustments = defaultAdjustments();
         }
         model = bundle?.workspace.model
           ? { ...bundle.workspace.model, revision: ++revision }
@@ -1619,7 +1708,7 @@ async function importSetup(file) {
     scheduleSave();
     toast("项目已恢复，图片与摆放参数均已载入");
   } catch (e) {
-    error(e);
+    if (epoch === projectEpoch) error(e);
   }
 }
 
@@ -1701,20 +1790,12 @@ function installModel(raw) {
         ),
       ),
       ctx = mask.getContext("2d");
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, mask.width, mask.height);
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    for (let i = 0; i < aligned.cap.length; i += 3) {
-      for (let j = 0; j < 3; j++) {
-        const k = aligned.cap[i + j] * 3,
-          x = (aligned.positions[k + 1] / aligned.width + 0.5) * mask.width,
-          y = (aligned.positions[k] / aligned.height + 0.5) * mask.height;
-        ctx[j ? "lineTo" : "moveTo"](x, y);
-      }
-      ctx.closePath();
-    }
-    ctx.fill();
+    ctx.putImageData(new ImageData(
+      raw.maskWidth === mask.width && raw.maskHeight === mask.height
+        ? raw.mask
+        : triangleMask(aligned.positions, aligned.cap, mask.width, mask.height, aligned.height, aligned.width),
+      mask.width, mask.height,
+    ), 0, 0);
     const contours = maskContours(mask),
       origin = worldPoint(
         { position: raw.alignment.origin, rotation: raw.alignment.rotation },
@@ -1865,126 +1946,6 @@ function startTrace() {
   }
 }
 
-function openWarp() {
-  remember();
-  $("warpDialog").showModal();
-  $("invertTarget").checked = state.target.invert;
-  drawWarp();
-}
-function drawWarp() {
-  const c = $("warpCanvas"),
-    x = c.getContext("2d"),
-    preview = targetCanvas(
-      targetOriginal,
-      state.target,
-      600,
-      state.target.clipToShadow ? getPatternBoundary() : null,
-    );
-  x.drawImage(preview, 0, 0, 600, 600);
-  x.strokeStyle = "#80e5c9";
-  x.lineWidth = 1.5;
-  x.setLineDash([5, 5]);
-  x.beginPath();
-  state.target.corners.forEach(([u, v], i) =>
-    x[i ? "lineTo" : "moveTo"](u * 600, v * 600),
-  );
-  x.closePath();
-  x.stroke();
-  x.setLineDash([]);
-  [...$("warpHandles").children].forEach((e, i) => {
-    e.style.left = `${state.target.corners[i][0] * 100}%`;
-    e.style.top = `${state.target.corners[i][1] * 100}%`;
-  });
-}
-function warpChanged() {
-  bake();
-  invalidate();
-  render();
-  drawWarp();
-  scheduleSave();
-}
-function wireWarp() {
-  $("warpOpen").onclick = openWarp;
-  $("warpHandles").innerHTML = ["左上", "右上", "右下", "左下"]
-    .map(
-      (label, i) =>
-        `<button class="warp-handle" data-corner="${i}" data-label="${label}" aria-label="${label}角，方向键可微调"></button>`,
-    )
-    .join("");
-  let drag = null,
-    pending = false;
-  for (const b of $("warpHandles").children) {
-    b.onpointerdown = (e) => {
-      e.preventDefault();
-      drag = Number(b.dataset.corner);
-      b.setPointerCapture(e.pointerId);
-    };
-    b.onpointermove = (e) => {
-      if (drag === null) return;
-      const rect = $("warpCanvas").getBoundingClientRect(),
-        c = clone(state.target.corners);
-      c[drag] = [
-        Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
-        Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
-      ];
-      if (validQuad(c)) {
-        state.target.corners = c;
-        if (!pending) {
-          pending = true;
-          requestAnimationFrame(() => {
-            pending = false;
-            drawWarp();
-          });
-        }
-      }
-    };
-    b.onpointerup = () => {
-      if (drag !== null) {
-        drag = null;
-        warpChanged();
-      }
-    };
-    b.onpointercancel = () => {
-      drag = null;
-      warpChanged();
-    };
-    b.onkeydown = (e) => {
-      const delta = {
-        ArrowLeft: [-0.01, 0],
-        ArrowRight: [0.01, 0],
-        ArrowUp: [0, -0.01],
-        ArrowDown: [0, 0.01],
-      }[e.key];
-      if (!delta) return;
-      e.preventDefault();
-      const c = clone(state.target.corners),
-        i = Number(b.dataset.corner);
-      c[i] = c[i].map((v, j) => Math.max(0, Math.min(1, v + delta[j])));
-      if (validQuad(c)) {
-        state.target.corners = c;
-        warpChanged();
-      }
-    };
-  }
-  $("warpReset").onclick = () => {
-    state.target.corners = [
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-    ];
-    warpChanged();
-  };
-  $("warpRotate").onclick = () => {
-    state.target.imageRotation = (state.target.imageRotation + 90) % 360;
-    warpChanged();
-  };
-  $("invertTarget").onchange = (e) => {
-    state.target.invert = e.target.checked;
-    warpChanged();
-  };
-}
-
 async function init() {
   try {
     const saved = TEST_MODE
@@ -2038,6 +1999,8 @@ async function init() {
       const o = state[key];
       o.position = pose.position;
       o.rotation = pose.rotation;
+      if (key === "light" && scene.mode === "translate" && o.type === "point")
+        o.rotation = aimRotation(o.position, state.lens.position);
       if (Number.isFinite(pose.outlineRotation))
         o.outlineRotation = pose.outlineRotation;
       state.preset = "custom";
@@ -2085,7 +2048,9 @@ async function init() {
           Number.isFinite(pose.outlineRotation)
         )
           bakeSource();
-        if (state.target.clipToShadow) bakeTarget();
+        // Direct-light crops use the complete shadow's GPU stencil during a
+        // drag. Reflection/blur use a smaller texture, restored on release.
+        if (state.target.clipToShadow && (state.reflect || state.view.sourceBlur)) bakeTarget(192);
         lastValidDrag = clone(state);
       } catch {
         state = clone(lastValidDrag);
@@ -2107,12 +2072,12 @@ async function init() {
       render();
     },
     end: () => {
-      bake();
-      if (model) {
+      if (!model && scene.selected === "lens") bakeSource();
+      if (state.target.clipToShadow) bakeTarget();
+      if (model && model.scale !== dragModelScale) {
         scene.setModel(model);
         syncMesh();
       }
-      scene.lensKey = scene.targetKey = "";
       render();
       scheduleSave();
     },

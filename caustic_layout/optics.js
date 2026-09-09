@@ -1,4 +1,6 @@
 import * as T from "./vendor/three.module.min.js";
+import { defaultAdjustments, validAdjustments } from "./image-adjustments.js";
+import { newProjectIdentity, validProjectIdentity } from "./project-identity.js";
 import {
   sourceBlur,
   SUN_DIAMETER_DEG,
@@ -48,10 +50,12 @@ export const clone = (v) => structuredClone(v);
 export const num = (v) => (Math.abs(v) < 1e-10 ? 0 : Number(v.toFixed(8)));
 
 export function migrateState(s) {
+  s.project ??= newProjectIdentity();
   const l = s.lens;
   s.view.shadow = true;
   s.view.grid = true;
   s.target.clipToShadow ??= false;
+  s.target.imageAdjustments ??= defaultAdjustments();
   s.light.angularDiameter ??= SUN_DIAMETER_DEG;
   // Old drafts had blur enabled without an explicit choice. Migrate that
   // default once; preserve choices made with the opt-in control thereafter.
@@ -122,6 +126,7 @@ export function syncLensDimensions(s) {
 export function defaultState() {
   return applyPreset(
     {
+      project: newProjectIdentity(),
       title: "我的光路",
       preset: "normalParallel",
       reflect: false,
@@ -166,6 +171,7 @@ export function defaultState() {
         imageRotation: 0,
         invert: false,
         clipToShadow: false,
+        imageAdjustments: defaultAdjustments(),
       },
       view: {
         rays: true,
@@ -451,6 +457,8 @@ export function configuration(s) {
 }
 
 export function validateState(s) {
+  if (s.project != null && !validProjectIdentity(s.project))
+    throw new Error("项目标识无效");
   if (!s || typeof s !== "object") throw new Error("缺少场景数据");
   if (
     typeof s.title !== "string" ||
@@ -524,6 +532,8 @@ export function validateState(s) {
     throw new Error("接收面范围无效");
   if (!validQuad(s.target.corners)) throw new Error("图像四角不能交叉或重叠");
   if (!Number.isFinite(s.target.imageRotation)) throw new Error("图像旋转无效");
+  if (s.target.imageAdjustments && !validAdjustments(s.target.imageAdjustments))
+    throw new Error("图像调整参数无效");
   if (typeof (s.target.clipToShadow ?? false) !== "boolean")
     throw new Error("阴影裁剪设置无效");
   if (!Number.isFinite(s.lens.outlineRotation ?? 0))
@@ -584,6 +594,7 @@ export function validQuad(c) {
 }
 
 export function makePacket(s, assets, { allowInvalidLayout = false } = {}) {
+  s.project ??= newProjectIdentity();
   validateState(s);
   const m = metrics(s),
     errors = m.warnings.filter((w) => w.level === "error");

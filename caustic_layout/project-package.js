@@ -1,3 +1,5 @@
+import { makeHandoff } from "./project-handoff.js";
+
 const encoder = new TextEncoder(),
   decoder = new TextDecoder();
 export const MAX_PROJECT_BYTES = 256 * 1024 * 1024;
@@ -154,9 +156,7 @@ async function sha256(data) {
   ).join("");
 }
 export async function makeProjectPackage(packet, uploads = {}, workspace = {}) {
-  const entries = [
-      { name: "optical-path.json", data: JSON.stringify(packet, null, 2) },
-    ],
+  const entries = [], files = {},
     manifest = {
       format: "caustic-optical-project",
       version: 2,
@@ -167,34 +167,38 @@ export async function makeProjectPackage(packet, uploads = {}, workspace = {}) {
       },
       originals: {},
     };
+  async function addFile(name, input, mime = "application/octet-stream") {
+    const data = await bytes(input), hash = await sha256(data);
+    entries.push({name, data});
+    files[name] = {sha256: hash, bytes: data.length, mime};
+    return {path: name, sha256: hash};
+  }
+  await addFile("optical-path.json", JSON.stringify(packet, null, 2), "application/json");
   for (const kind of ["source", "target"]) {
-    entries.push({
-      name: `prepared/${kind}.png`,
-      data: dataURLBytes(packet.assets[kind].data_url),
-    });
+    await addFile(`prepared/${kind}.png`, dataURLBytes(packet.assets[kind].data_url), "image/png");
     const upload = uploads[kind],
       edit = packet.assets[`${kind}_original`];
     if (upload) {
       const data = await bytes(upload.blob),
         path = `originals/${kind}-${safeName(upload.name)}`;
-      entries.push({ name: path, data });
+      const file = await addFile(path, data, upload.type || "application/octet-stream");
       manifest.originals[kind] = {
         path,
         name: upload.name,
         mime: upload.type || "application/octet-stream",
         original_bytes: true,
-        sha256: await sha256(data),
+        sha256: file.sha256,
       };
     } else if (edit) {
       const data = dataURLBytes(edit.data_url),
         path = `originals/${kind}-browser-copy.png`;
-      entries.push({ name: path, data });
+      const file = await addFile(path, data, "image/png");
       manifest.originals[kind] = {
         path,
         name: edit.name,
         mime: "image/png",
         original_bytes: false,
-        sha256: await sha256(data),
+        sha256: file.sha256,
         note: "网页解码后的图像副本，可能已缩小或裁边；未取得上传文件原始字节。",
       };
     }
@@ -206,8 +210,7 @@ export async function makeProjectPackage(packet, uploads = {}, workspace = {}) {
     traceQuality: workspace.traceQuality || "standard",
   };
   async function binary(path, data) {
-    entries.push({ name: path, data });
-    return { path, sha256: await sha256(data) };
+    return addFile(path, data);
   }
   if (workspace.model) {
     const model = workspace.model;
@@ -249,8 +252,10 @@ export async function makeProjectPackage(packet, uploads = {}, workspace = {}) {
       ),
     };
   }
-  entries.push({ name: "workspace.json", data: JSON.stringify(saved) });
+  await addFile("workspace.json", JSON.stringify(saved), "application/json");
   manifest.workspace = "workspace.json";
+  const handoff = await makeHandoff(packet, manifest, saved, files, value => sha256(encoder.encode(value)));
+  manifest.handoff = await addFile("handoff.json", JSON.stringify(handoff, null, 2), "application/json");
   entries.push({
     name: "manifest.json",
     data: JSON.stringify(manifest, null, 2),
@@ -273,6 +278,17 @@ export async function readProjectPackage(file) {
     throw new Error("请选择本页面导出的光路项目包");
   const packet = JSON.parse(decoder.decode(entries.get(m.configuration))),
     uploads = {};
+  if (m.handoff) {
+    const data = entries.get(m.handoff.path);
+    if (!data || (await sha256(data)) !== m.handoff.sha256)
+      throw new Error("项目摘要校验失败");
+    const handoff = JSON.parse(decoder.decode(data));
+    for (const path of [m.configuration, ...Object.values(m.prepared)]) {
+      const file = entries.get(path);
+      if (!file || (await sha256(file)) !== handoff.files?.[path]?.sha256)
+        throw new Error("项目摘要与文件不一致");
+    }
+  }
   for (const kind of ["source", "target"]) {
     const info = m.originals?.[kind];
     if (!info?.original_bytes) continue;

@@ -2,14 +2,42 @@
 export const english = `
 焦散光路|Caustic Layout
 项目名称|Project name
+项目标识无效|Invalid project identity
+项目摘要校验失败|Project summary checksum failed
+项目摘要与文件不一致|Project summary does not match its files
 点击编辑项目名称|Click to rename project
 编辑项目名称|Rename project
+调整图像|Adjust image
+关闭图像编辑器|Close image editor
+图像调整预览|Image adjustment preview
+颜色模式|Color mode
+原色|Original color
+灰度|Grayscale
+黑白|Black & white
+阈值|Threshold
+曲线 · 灰度直方图|Curve · luminance histogram
+重置曲线|Reset curve
+亮度曲线，点击添加控制点，使用方向键调整|Tone curve. Click to add a point; use arrow keys to adjust.
+点击添加控制点，拖动调整；双击删除。|Click to add a point, drag to adjust, double-click to remove.
+删除控制点|Remove point
+恢复原图|Restore original
+应用|Apply
+输入|Input
+输出|Output
+图像调整参数无效|Invalid image adjustments
 已保存在此浏览器|Saved in this browser
 正在保存…|Saving…
 原文件尚未保存，请导出项目|Originals are not saved yet. Export your project.
 图片较大，请导出保存|Images are too large for local storage. Export to save.
 撤销|Undo
 重做|Redo
+新建项目|New project
+新项目|New project
+全部重置为新项目|Reset everything to a new project
+已新建项目，可撤销恢复。|New project created. Undo to restore.
+绕透镜中心旋转|Orbit lens center
+调节光源距离|Adjust light distance
+旋转绕透镜中心，缩放调节灯距。|Rotate around the lens center. Scale to adjust light distance.
 打开已保存的项目|Open a saved project
 导出完整项目，可保存或分享|Save or share your project
 导出项目|Export project
@@ -277,7 +305,9 @@ OBJ 面索引无效|The OBJ contains invalid face indices
 OBJ 中没有三角网格|The OBJ contains no triangle mesh
 模型缺少平面入射面。请将入射面放在 XY 平面，+Z 朝向光源。|The model needs a flat entrance face in the XY plane, with +Z facing the source.
 正在读取 STEP 曲面…|Reading STEP surfaces…
+正在准备轮廓…|Preparing the outline…
 无法解析 STEP 实体|Could not read the STEP solid
+STEP 中有曲面未能转换，请重新导出 STEP，或改用 OBJ。|Some STEP surfaces could not be converted. Export the STEP again or use OBJ.
 文件中没有有效的三角网格|The file contains no valid triangle mesh
 模型超过 250 万个三角面，请降低导出网格分辨率|The model exceeds 2.5 million triangles. Export a lighter mesh.
 模型坐标含无效数值|The model contains invalid coordinates
