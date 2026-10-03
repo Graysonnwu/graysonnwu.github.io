@@ -1,0 +1,2 @@
+# Keep the byte-level ASS export fixture's BOM and CRLF intact.
+tests/fixtures/export.ass -text -diff

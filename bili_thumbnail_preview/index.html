@@ -161,6 +161,8 @@
         cursor: move;
         background: rgba(255, 255, 255, 0.15);
         transition: opacity 0.2s;
+        touch-action: none;
+        user-select: none;
     }
     
     .crop-box::before {
@@ -358,6 +360,29 @@
     #cover-169-2 { width: 173px; }
 
     .tip { font-size: 13px; color: #888; margin-top: 10px; display: none; text-align: center; }
+    .status { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+    .status.error { color: #ff9292; }
+    .input-item input { min-width: 0; }
+    .layer-controls { flex-wrap: wrap; }
+    .card-horizontal .info { min-width: 0; }
+    .preview-group:nth-child(2) { min-width: 0; width: 100%; }
+    :focus-visible { outline: 2px solid var(--color-169); outline-offset: 3px; }
+    @media (max-width: 780px) {
+        .preview-section { flex-direction: column; }
+        .preview-group:nth-child(2) { flex: none; }
+    }
+    @media (max-width: 540px) {
+        body { padding: 20px 12px; }
+        .control-panel { padding: 14px; }
+        .input-item { min-width: 0; flex-basis: 100%; }
+        .upload-zone { padding: 40px 16px; }
+        .upload-zone h2 { font-size: 20px; }
+        .card-horizontal .cover { width: 44%; }
+        #cover-169-2 { width: 38%; }
+        .card-horizontal .title { font-size: 13px; line-height: 18px; }
+        .card-horizontal .up-info { font-size: 11px; line-height: 18px; }
+        .preview-section { gap: 28px; }
+    }
 </style>
 </head>
 <body>
@@ -367,11 +392,11 @@
     <div class="control-panel">
         <div class="input-group">
             <div class="input-item">
-                <label>视频标题</label>
+                <label for="input-title">视频标题</label>
                 <input type="text" id="input-title" value="" placeholder="输入视频标题">
             </div>
             <div class="input-item">
-                <label>UP主昵称</label>
+                <label for="input-up">UP主昵称</label>
                 <input type="text" id="input-up" value="" placeholder="输入UP主名字">
             </div>
         </div>
@@ -387,9 +412,9 @@
 
     <!-- 上部：图片上传与裁剪区 -->
     <div class="editor-section">
-        <div class="upload-zone" id="drop-zone">
+        <div class="upload-zone" id="drop-zone" role="button" tabindex="0" aria-label="上传本地封面图片">
             <h2>点击或拖拽图片到此处上传</h2>
-            <p style="margin-top: 10px">支持任意尺寸，上传后可自由调整封面裁切区域</p>
+            <p style="margin-top: 10px">支持常见图片格式（≤64 MB、≤1亿像素），可自由调整封面裁切区域</p>
             <input type="file" id="file-input" accept="image/*">
         </div>
         
@@ -405,6 +430,7 @@
             </div>
         </div>
         <p class="tip" id="editor-tip">💡 提示：可直接拖拽新图片到此区域替换；拖拽框体中心可移动，拖拽右下角圆点可等比例缩放。</p>
+        <p class="status" id="image-status" role="status" aria-live="polite">图片仅在本机处理。支持拖拽、粘贴或选择图片。</p>
     </div>
 
     <!-- 下部：实时预览区 -->
@@ -476,7 +502,8 @@
     </div>
 </div>
 
-<script>
+<script type="module">
+    import { fitCrop, resizeCrop, moveCrop, scaleCrop } from './crop-geometry.mjs';
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const workspace = document.getElementById('workspace');
@@ -498,7 +525,7 @@
     const btn43 = document.getElementById('btn-43');
 
     let imgLoaded = false;
-    let activeKey = '169';
+    let activeKey = '43';
     let lastContainerW = 0; 
     let lastContainerH = 0; 
 
@@ -524,10 +551,13 @@
         boxState[key].el.classList.add('active');
         boxState[otherKey].el.classList.remove('active');
         boxState[key].btn.classList.add(`active-${key}`);
+        boxState[key].btn.setAttribute('aria-pressed', 'true');
+        boxState[otherKey].btn.setAttribute('aria-pressed', 'false');
         boxState[otherKey].btn.classList.remove(`active-${otherKey}`);
     }
     btn169.addEventListener('click', () => setActiveLayer('169'));
     btn43.addEventListener('click', () => setActiveLayer('43'));
+    setActiveLayer('43');
 
     // --- 需求③：上传与更换图片逻辑 ---
     btnReupload.addEventListener('click', () => fileInput.click());
@@ -554,14 +584,48 @@
         fileInput.value = '';
     });
 
-    function handleFile(file) {
-        if (!file.type.startsWith('image/')) return alert('请上传图片文件！');
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            sourceImg.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+    const imageStatus = document.getElementById('image-status');
+    let loadGeneration = 0;
+    let imageURL = null;
+    function status(message, error = false) {
+        imageStatus.textContent = message;
+        imageStatus.classList.toggle('error', error);
     }
+    dropZone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    document.addEventListener('paste', e => {
+        if (e.target.closest('input, textarea, [contenteditable]')) return;
+        const image = [...(e.clipboardData?.files || [])].find(file => file.type.startsWith('image/'));
+        if (image) { e.preventDefault(); handleFile(image); }
+    });
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) return status('请选择可解码的图片文件。', true);
+        if (file.size > 64 * 1024 * 1024) return status('图片超过 64 MB，请先压缩后再试。', true);
+        const generation = ++loadGeneration;
+        const url = URL.createObjectURL(file);
+        const candidate = new Image();
+        status('正在读取图片…');
+        candidate.onload = () => {
+            if (generation !== loadGeneration) { URL.revokeObjectURL(url); return; }
+            if (!candidate.naturalWidth || !candidate.naturalHeight || candidate.naturalWidth * candidate.naturalHeight > 100_000_000) {
+                URL.revokeObjectURL(url);
+                status('图片尺寸过大或无效，请使用不超过 1 亿像素的图片。', true);
+                return;
+            }
+            const previous = imageURL;
+            imageURL = url;
+            sourceImg.src = url;
+            if (previous) URL.revokeObjectURL(previous);
+            status(`${file.name} · ${candidate.naturalWidth} × ${candidate.naturalHeight} · 本机处理`);
+        };
+        candidate.onerror = () => {
+            URL.revokeObjectURL(url);
+            if (generation === loadGeneration) status('无法解码这张图片，请尝试 PNG、JPEG 或 WebP。', true);
+        };
+        candidate.src = url;
+    }
+    window.addEventListener('pagehide', () => { if (imageURL) URL.revokeObjectURL(imageURL); });
 
     // 图片加载/替换后的重新渲染逻辑
     sourceImg.addEventListener('load', () => {
@@ -570,8 +634,8 @@
         } else {
             // 当更换图片时，等待DOM更新完图片宽高后，重新计算裁切框
             requestAnimationFrame(() => {
-                lastContainerW = imgContainer.clientWidth;
-                lastContainerH = imgContainer.clientHeight;
+                lastContainerW = sourceImg.getBoundingClientRect().width;
+                lastContainerH = sourceImg.getBoundingClientRect().height;
                 initBox('169', lastContainerW, lastContainerH);
                 initBox('43', lastContainerW, lastContainerH);
                 updatePreviews();
@@ -585,11 +649,11 @@
         previewSection.style.opacity = '1';
         previewSection.style.pointerEvents = 'auto';
         editorTip.style.display = 'block';
-        btnReupload.style.display = 'block'; // 显示更换图片按钮
+        btnReupload.style.display = 'block';
         imgLoaded = true;
 
-        lastContainerW = imgContainer.clientWidth;
-        lastContainerH = imgContainer.clientHeight;
+        lastContainerW = sourceImg.getBoundingClientRect().width;
+        lastContainerH = sourceImg.getBoundingClientRect().height;
 
         initBox('169', lastContainerW, lastContainerH);
         initBox('43', lastContainerW, lastContainerH);
@@ -597,20 +661,8 @@
     }
 
     function initBox(key, cW, cH) {
-        let state = boxState[key];
-        
-        // 保证有一个方向顶格撑满，另一个方向居中
-        let w = cW;
-        let h = w / state.ratio;
-        if (h > cH) {
-            h = cH;
-            w = h * state.ratio;
-        }
-        
-        state.w = w;
-        state.h = h;
-        state.x = (cW - w) / 2;
-        state.y = (cH - h) / 2;
+        const state = boxState[key];
+        Object.assign(state, fitCrop(cW, cH, state.ratio));
         applyBoxDOM(state);
     }
 
@@ -625,84 +677,32 @@
     function bindBoxEvents(key) {
         const state = boxState[key];
         const el = state.el;
-        const handle = el.querySelector('.resize-handle');
-
-        let isDragging = false;
-        let isResizing = false;
-        let startX, startY, startBoxX, startBoxY, startBoxW;
-
-        handle.addEventListener('mousedown', (e) => {
-            if (activeKey !== key) return;
-            e.stopPropagation();
-            isResizing = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            startBoxW = state.w;
-            startBoxX = state.x;
-            startBoxY = state.y;
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+        let gesture = null;
+        el.addEventListener('pointerdown', e => {
+            if (!imgLoaded || (e.pointerType === 'mouse' && e.button !== 0)) return;
+            e.preventDefault();
+            setActiveLayer(key);
+            gesture = { id: e.pointerId, x: e.clientX, y: e.clientY,
+                resize: e.target.classList.contains('resize-handle'),
+                start: { x: state.x, y: state.y, w: state.w, h: state.h } };
+            el.setPointerCapture(e.pointerId);
         });
-
-        el.addEventListener('mousedown', (e) => {
-            if (activeKey !== key) setActiveLayer(key);
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            startBoxX = state.x;
-            startBoxY = state.y;
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
-
-        function onMouseMove(e) {
-            const containerW = imgContainer.clientWidth;
-            const containerH = imgContainer.clientHeight;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-
-            if (isResizing) {
-                let newW = startBoxW + dx;
-                let newH = newW / state.ratio;
-
-                if (startBoxX + newW > containerW) {
-                    newW = containerW - startBoxX;
-                    newH = newW / state.ratio;
-                }
-                if (startBoxY + newH > containerH) {
-                    newH = containerH - startBoxY;
-                    newW = newH * state.ratio;
-                }
-                if (newW < 60) {
-                    newW = 60;
-                    newH = newW / state.ratio;
-                }
-
-                state.w = newW;
-                state.h = newH;
-            } else if (isDragging) {
-                let newX = startBoxX + dx;
-                let newY = startBoxY + dy;
-
-                if (newX < 0) newX = 0;
-                if (newY < 0) newY = 0;
-                if (newX + state.w > containerW) newX = containerW - state.w;
-                if (newY + state.h > containerH) newY = containerH - state.h;
-
-                state.x = newX;
-                state.y = newY;
-            }
-            
+        el.addEventListener('pointermove', e => {
+            if (!gesture || e.pointerId !== gesture.id) return;
+            const dx = e.clientX - gesture.x;
+            const dy = e.clientY - gesture.y;
+            const width = sourceImg.getBoundingClientRect().width;
+            const height = sourceImg.getBoundingClientRect().height;
+            Object.assign(state, gesture.resize
+                ? resizeCrop(gesture.start, dx, dy, width, height, state.ratio)
+                : moveCrop(gesture.start, dx, dy, width, height));
             applyBoxDOM(state);
-            updatePreviews();
-        }
-
-        function onMouseUp() {
-            isDragging = false;
-            isResizing = false;
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-        }
+            schedulePreviews();
+        });
+        function finish(e) { if (gesture?.id === e.pointerId) gesture = null; }
+        el.addEventListener('pointerup', finish);
+        el.addEventListener('pointercancel', finish);
+        el.addEventListener('lostpointercapture', finish);
     }
     bindBoxEvents('169');
     bindBoxEvents('43');
@@ -711,8 +711,8 @@
     function updatePreviews() {
         if (!imgLoaded) return;
         
-        const scaleX = sourceImg.naturalWidth / imgContainer.clientWidth;
-        const scaleY = sourceImg.naturalHeight / imgContainer.clientHeight;
+        const scaleX = sourceImg.naturalWidth / sourceImg.getBoundingClientRect().width;
+        const scaleY = sourceImg.naturalHeight / sourceImg.getBoundingClientRect().height;
 
         const s43 = boxState['43'];
         const s169 = boxState['169'];
@@ -726,52 +726,39 @@
         ctx2.drawImage(canvas169_1, 0, 0);
     }
 
+    // Previews only need display resolution.
     function drawToCanvas(canvas, state, scaleX, scaleY) {
+        const ratio = state.ratio;
+        const w = Math.min(Math.round(state.w * scaleX), Math.ceil(520 * Math.min(devicePixelRatio || 1, 2)));
+        canvas.width = Math.max(1, w);
+        canvas.height = Math.max(1, Math.round(canvas.width / ratio));
         const ctx = canvas.getContext('2d');
-        canvas.width = state.w * scaleX;
-        canvas.height = state.h * scaleY;
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(
-            sourceImg, 
-            state.x * scaleX, state.y * scaleY, state.w * scaleX, state.h * scaleY,
-            0, 0, canvas.width, canvas.height
-        );
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(sourceImg, state.x * scaleX, state.y * scaleY, state.w * scaleX, state.h * scaleY,
+            0, 0, canvas.width, canvas.height);
     }
-
+    let previewFrame = null;
+    function schedulePreviews() {
+        if (previewFrame !== null) return;
+        previewFrame = requestAnimationFrame(() => { previewFrame = null; updatePreviews(); });
+    }
     // --- 窗口改变自适应计算 ---
-    window.addEventListener('resize', () => {
-        if(!imgLoaded) return;
-        const newW = imgContainer.clientWidth;
-        const newH = imgContainer.clientHeight;
-        if(newW === lastContainerW && newH === lastContainerH) return;['169', '43'].forEach(key => {
-            const state = boxState[key];
-            const ratioX = state.x / lastContainerW;
-            const ratioY = state.y / lastContainerH;
-            const ratioW = state.w / lastContainerW;
-
-            let newBoxW = newW * ratioW;
-            let newBoxH = newBoxW / state.ratio;
-            let newBoxX = newW * ratioX;
-            let newBoxY = newH * ratioY;
-
-            if (newBoxX + newBoxW > newW) newBoxX = newW - newBoxW;
-            if (newBoxY + newBoxH > newH) newBoxY = newH - newBoxH;
-            if (newBoxX < 0) newBoxX = 0;
-            if (newBoxY < 0) newBoxY = 0;
-
-            state.w = newBoxW;
-            state.h = newBoxH;
-            state.x = newBoxX;
-            state.y = newBoxY;
-            
+    function resizeEditor() {
+        if (!imgLoaded) return;
+        const width = sourceImg.getBoundingClientRect().width;
+        const height = sourceImg.getBoundingClientRect().height;
+        if (!width || !height || (width === lastContainerW && height === lastContainerH)) return;
+        for (const state of Object.values(boxState)) {
+            Object.assign(state, scaleCrop(state, lastContainerW, lastContainerH, width, height, state.ratio));
             applyBoxDOM(state);
-        });
+        }
+        lastContainerW = width;
+        lastContainerH = height;
+        schedulePreviews();
+    }
+    new ResizeObserver(resizeEditor).observe(imgContainer);
+    window.addEventListener('resize', resizeEditor);
 
-        lastContainerW = newW;
-        lastContainerH = newH;
-        updatePreviews();
-    });
 </script>
 
 </body>

@@ -1102,7 +1102,7 @@
       vMax: 10,
       lensMin: 1,
       lensMax: 20,
-      fMin: 0.5,
+      fMin: 0.25,
       fMax: 5,
       mMin: 1.05,
       mMax: 21,
@@ -1379,6 +1379,7 @@
     }
 
     function setZoom(value) {
+      if (!Number.isFinite(value)) return;
       state.zoom = clamp(value, view.minZoom, view.maxZoom);
       updateSceneView();
       scheduleUrlSync();
@@ -1392,42 +1393,30 @@
       const pt = els.scene.createSVGPoint();
       pt.x = event.clientX;
       pt.y = event.clientY;
-      return pt.matrixTransform(els.scene.getScreenCTM().inverse());
+      const matrix = els.scene.getScreenCTM();
+      return matrix ? pt.matrixTransform(matrix.inverse()) : null;
     }
 
     function applyFixedFromU(nextU) {
       const f = state.fixedF;
-      if (state.mode === "parallel") {
-        state.u = clamp(f, LIMITS.uMin, LIMITS.uMax);
-        return;
-      }
-      const safeU = clamp(Math.max(nextU, f + LIMITS.epsilon), LIMITS.uMin, LIMITS.uMax);
-      const solvedV = solveVFromU(safeU, f);
-      if (Number.isFinite(solvedV) && solvedV <= LIMITS.vMax) {
-        state.u = safeU;
-        state.v = clamp(solvedV, LIMITS.vMin, LIMITS.vMax);
-        return;
-      }
-      state.v = LIMITS.vMax;
-      state.u = clamp(solveUFromV(state.v, f), LIMITS.uMin, LIMITS.uMax);
+      if (state.mode === "parallel") { state.u = f; return; }
+      const minU = Math.max(LIMITS.uMin, solveUFromV(LIMITS.vMax, f));
+      const maxU = f < LIMITS.vMin ? Math.min(LIMITS.uMax, solveUFromV(LIMITS.vMin, f)) : LIMITS.uMax;
+      state.u = clamp(nextU, minU, maxU);
+      state.v = solveVFromU(state.u, f);
     }
 
     function applyFixedFromV(nextV) {
       const f = state.fixedF;
-      const safeV = clamp(Math.max(nextV, f + LIMITS.epsilon), LIMITS.vMin, LIMITS.vMax);
-      const solvedU = solveUFromV(safeV, f);
-      if (Number.isFinite(solvedU) && solvedU <= LIMITS.uMax) {
-        state.v = safeV;
-        state.u = clamp(solvedU, LIMITS.uMin, LIMITS.uMax);
-        return;
-      }
-      state.u = LIMITS.uMax;
-      state.v = clamp(solveVFromU(state.u, f), LIMITS.vMin, LIMITS.vMax);
+      const minV = Math.max(LIMITS.vMin, solveVFromU(LIMITS.uMax, f));
+      const maxV = f < LIMITS.uMin ? Math.min(LIMITS.vMax, solveVFromU(LIMITS.uMin, f)) : LIMITS.vMax;
+      state.v = clamp(nextV, minV, maxV);
+      state.u = solveUFromV(state.v, f);
     }
 
     function syncDerived() {
-      state.fixedF = clamp(currentFocal(), 0.01, LIMITS.fMax);
-      state.fixedM = clamp(currentMagnification(), LIMITS.mMin, LIMITS.mMax);
+      state.fixedF = currentFocal();
+      state.fixedM = currentMagnification();
     }
 
     function clampFForFixedM(f, m) {
@@ -1439,7 +1428,8 @@
     function clampMForFixedF(m, f) {
       const minFromVMax = LIMITS.vMax > f ? LIMITS.vMax / (LIMITS.vMax - f) : LIMITS.mMax;
       const minM = Math.max(LIMITS.mMin, LIMITS.uMin / f, minFromVMax);
-      const maxM = Math.min(LIMITS.mMax, LIMITS.uMax / f);
+      const maxFromVMin = f < LIMITS.vMin ? LIMITS.vMin / (LIMITS.vMin - f) : LIMITS.mMax;
+      const maxM = Math.min(LIMITS.mMax, LIMITS.uMax / f, maxFromVMin);
       return clamp(m, minM, maxM);
     }
 
@@ -1479,7 +1469,7 @@
 
     function solveFromFAndM(nextF, nextM, fixedAxis = null) {
       let m = clamp(nextM, LIMITS.mMin, LIMITS.mMax);
-      let f = clamp(nextF, LIMITS.fMin, LIMITS.fMax);
+      let f = clamp(nextF, fixedAxis === "f" ? pointFocal(LIMITS.uMin, LIMITS.vMin) : LIMITS.fMin, LIMITS.fMax);
       if (fixedAxis === "m") {
         f = clampFForFixedM(f, m);
       } else if (fixedAxis === "f") {
@@ -1492,8 +1482,9 @@
     }
 
     function setU(value) {
+      if (!Number.isFinite(value)) return;
       const next = clamp(roundStep(value, 0.1), LIMITS.uMin, LIMITS.uMax);
-      if (state.lock === "u") return;
+      if (state.lock === "u" || (state.mode === "parallel" && state.lock === "f")) return;
       if (state.mode === "parallel") {
         state.u = next;
         syncDerived();
@@ -1515,6 +1506,7 @@
     }
 
     function setV(value) {
+      if (!Number.isFinite(value)) return;
       const next = clamp(roundStep(value, 0.1), LIMITS.vMin, LIMITS.vMax);
       if (state.mode !== "point" || state.lock === "v") return;
       if (state.lock === "f") {
@@ -1535,14 +1527,16 @@
     }
 
     function setLens(value) {
+      if (!Number.isFinite(value)) return;
       state.lens = clamp(roundStep(value), LIMITS.lensMin, LIMITS.lensMax);
       render();
       scheduleUrlSync();
     }
 
     function setF(value) {
-      const next = clamp(roundStep(value, 0.1), LIMITS.fMin, LIMITS.fMax);
-      if (state.lock === "f") return;
+      if (!Number.isFinite(value)) return;
+      const next = clamp(roundStep(value, 0.05), state.mode === "parallel" ? LIMITS.uMin : LIMITS.fMin, state.mode === "parallel" ? LIMITS.uMax : LIMITS.fMax);
+      if (state.lock === "f" || (state.mode === "parallel" && state.lock === "u")) return;
       state.fixedF = next;
       if (state.mode === "parallel") {
         state.u = clamp(next, LIMITS.uMin, LIMITS.uMax);
@@ -1569,6 +1563,7 @@
     }
 
     function setM(value) {
+      if (!Number.isFinite(value)) return;
       if (state.mode === "parallel" || state.lock === "m") return;
       const next = clamp(roundStep(value, 0.05), LIMITS.mMin, LIMITS.mMax);
       state.fixedM = next;
@@ -1592,9 +1587,19 @@
     }
 
     function setMode(mode) {
+      if (mode === state.mode) return;
+      const lockedF = state.lock === "f" ? currentFocal() : null;
       state.mode = mode;
       if (mode === "parallel" && (state.lock === "v" || state.lock === "m")) {
         state.lock = null;
+      }
+      if (lockedF !== null) {
+        const minF = mode === "parallel" ? LIMITS.uMin : pointFocal(LIMITS.uMin, LIMITS.vMin);
+        const maxF = mode === "parallel" ? LIMITS.uMax : LIMITS.fMax;
+        // A focal length outside the new mode's feasible range cannot remain locked.
+        if (lockedF < minF || lockedF > maxF) state.lock = null;
+        else if (mode === "parallel") state.u = lockedF;
+        else { state.fixedF = lockedF; applyFixedFromV(state.v); }
       }
       syncDerived();
       updateSceneView();
@@ -1606,10 +1611,10 @@
       if (state.mode === "parallel" && (next === "v" || next === "m")) return;
       state.lock = next;
       if (state.lock === "f") {
-        state.fixedF = clamp(roundStep(currentFocal(), 0.1), LIMITS.fMin, LIMITS.fMax);
+        state.fixedF = currentFocal();
       }
       if (state.lock === "m") {
-        state.fixedM = clamp(roundStep(currentMagnification(), 0.05), LIMITS.mMin, LIMITS.mMax);
+        state.fixedM = currentMagnification();
       }
       updateSceneView();
       scheduleUrlSync();
@@ -1619,9 +1624,9 @@
       for (const name of names) {
         const raw = params.get(name);
         if (raw === null || raw.trim() === "") continue;
-        const value = Number.parseFloat(raw);
+        const value = Number(raw);
         if (Number.isFinite(value)) {
-          return clamp(roundStep(value, step), min, max);
+          return clamp(step === null ? value : roundStep(value, step), min, max);
         }
       }
       return null;
@@ -1649,7 +1654,7 @@
         mag: "m",
         magnification: "m"
       };
-      const lock = aliases[raw] || null;
+      const lock = Object.hasOwn(aliases, raw) ? aliases[raw] : null;
       if (mode === "parallel" && (lock === "v" || lock === "m")) return null;
       return lock;
     }
@@ -1699,6 +1704,7 @@
     }
 
     function applyUrlState() {
+      Object.assign(state, DEFAULTS, { activeDrag: null });
       const params = new URLSearchParams(window.location.search);
       if (![...params.keys()].length) return false;
 
@@ -1706,10 +1712,10 @@
       const lens = readUrlNumber(params, ["x", "lens", "size", "unit"], LIMITS.lensMin, LIMITS.lensMax, 0.5);
       const mode = readUrlMode(params) || "point";
       const values = {
-        u: readUrlNumber(params, ["u"], LIMITS.uMin, LIMITS.uMax, 0.1),
-        v: readUrlNumber(params, ["v"], LIMITS.vMin, LIMITS.vMax, 0.1),
-        f: readUrlNumber(params, ["f", "focus", "focal"], LIMITS.fMin, LIMITS.fMax, 0.1),
-        m: readUrlNumber(params, ["m", "mag", "magnification"], LIMITS.mMin, LIMITS.mMax, 0.05)
+        u: readUrlNumber(params, ["u"], LIMITS.uMin, LIMITS.uMax, null),
+        v: readUrlNumber(params, ["v"], LIMITS.vMin, LIMITS.vMax, null),
+        f: readUrlNumber(params, ["f", "focus", "focal"], mode === "parallel" ? LIMITS.uMin : LIMITS.fMin, mode === "parallel" ? LIMITS.uMax : LIMITS.fMax, null),
+        m: readUrlNumber(params, ["m", "mag", "magnification"], LIMITS.mMin, LIMITS.mMax, null)
       };
 
       if (lens !== null) state.lens = lens;
@@ -1733,9 +1739,9 @@
       const params = new URLSearchParams();
       params.set("x", fmt(state.lens, 1));
       params.set("mode", state.mode);
-      params.set("u", fmt(state.u, 1));
+      params.set("u", String(Number(state.u.toFixed(10))));
       if (state.mode === "point") {
-        params.set("v", fmt(state.v, 1));
+        params.set("v", String(Number(state.v.toFixed(10))));
       }
       if (state.lock) {
         params.set("lock", state.lock);
@@ -2045,8 +2051,13 @@
       els.vRange.value = String(v);
       updateInput(els.lensInput, lensPhysical);
       els.lensRange.value = String(lensPhysical);
+      const minF = sourceVisible ? LIMITS.fMin : LIMITS.uMin;
+      const maxF = sourceVisible ? LIMITS.fMax : LIMITS.uMax;
+      for (const input of [els.focalRange, els.focalInput]) {
+        input.min = String(minF); input.max = String(maxF); input.step = '0.05';
+      }
       updateInput(els.focalInput, f);
-      els.focalRange.value = String(clamp(f, LIMITS.fMin, LIMITS.fMax));
+      els.focalRange.value = String(f);
       els.mRange.value = String(clamp(mag, LIMITS.mMin, LIMITS.mMax));
 
       els.uRange.disabled = state.lock === "u";
@@ -2097,7 +2108,12 @@
         if (input.value === "" || input.value === "-" || input.value.endsWith(".")) return;
         setter(Number(input.value));
       });
-      input.addEventListener("change", () => setter(Number(input.value)));
+      input.addEventListener("change", () => {
+        if (input.value.trim() !== "") setter(Number(input.value));
+      });
+      input.addEventListener("blur", () => {
+        render();
+      });
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") input.blur();
       });
@@ -2149,6 +2165,7 @@
     }
 
     function onPointerDown(event) {
+      if (event.button !== 0 || event.isPrimary === false) return;
       if (event.target.closest(".scene-lock-control")) return;
       const target = event.target.closest("[data-drag]");
       if (!target) return;
@@ -2164,9 +2181,9 @@
       if (!state.activeDrag) return;
       const point = svgPointFromEvent(event);
       if (state.activeDrag === "wall") {
-        setU(-point.x);
+        if (point) setU(-point.x);
       } else if (state.activeDrag === "source") {
-        setV(point.x);
+        if (point) setV(point.x);
       }
     }
 
@@ -2298,11 +2315,13 @@
     els.scene.addEventListener("pointerup", onPointerUp);
     els.scene.addEventListener("pointercancel", onPointerUp);
     els.wallGroup.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") event.preventDefault();
       if (event.key === "ArrowLeft") setU(state.u + 0.1);
       if (event.key === "ArrowRight") setU(state.u - 0.1);
     });
 
     els.sourceGroup.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") event.preventDefault();
       if (event.key === "ArrowLeft") setV(state.v - 0.1);
       if (event.key === "ArrowRight") setV(state.v + 0.1);
     });
@@ -2313,9 +2332,8 @@
       window.addEventListener("resize", () => updateSceneView());
     }
     window.addEventListener("popstate", () => {
-      if (applyUrlState()) {
-        updateSceneView();
-      }
+      applyUrlState();
+      updateSceneView();
     });
     const hadUrlParams = applyUrlState();
     updateSceneView();

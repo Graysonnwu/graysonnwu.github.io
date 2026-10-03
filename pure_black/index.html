@@ -100,6 +100,10 @@
 
   function acquireWake() {
     if (!active() || (wake && !wake.released)) return;
+    if (!navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') {
+      root.dataset.awake = 'unsupported';
+      return;
+    }
     if (pending) return pending;
     const id = epoch;
     pending = (async () => {
@@ -138,7 +142,11 @@
     busy = true;
     try {
       if (fullscreen()) await exit();
-      else await (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' });
+      else {
+        const request = root.requestFullscreen || root.webkitRequestFullscreen;
+        if (!request) return;
+        await request.call(root, { navigationUI: 'hide' });
+      }
     } catch (error) { console.warn('Fullscreen:', error); }
     finally { busy = false; void syncWake(); }
   }
@@ -150,8 +158,13 @@
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void toggle(); }
   });
   for (const event of ['fullscreenchange', 'webkitfullscreenchange']) {
-    document.addEventListener(event, () => { showCursor(); void syncWake(); });
+    document.addEventListener(event, () => {
+      document.body.setAttribute('aria-pressed', String(fullscreen()));
+      document.body.setAttribute('aria-label', fullscreen() ? '退出全屏' : '进入全屏');
+      showCursor(); void syncWake();
+    });
   }
+  document.body.setAttribute('aria-pressed', String(fullscreen()));
   document.addEventListener('pointermove', (event) => { if (event.pointerType !== 'touch') showCursor(); }, { passive: true });
   document.addEventListener('pointerdown', showCursor, { passive: true });
   document.addEventListener('visibilitychange', () => {

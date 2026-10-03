@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>字幕对齐工具 - 可调宽可三栏可高亮斑马纹版</title>
+    <title>字幕双语对齐工具</title>
     <style>
         :root {
             /* 黑暗模式配色 */
@@ -31,7 +31,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100dvh;
             box-sizing: border-box;
         }
 
@@ -72,7 +72,8 @@
         }
 
         .editor-container {
-            position: relative; 
+            position: relative;
+            min-height: 0;
             display: flex;
             flex: 1;
             border: 1px solid var(--border-color);
@@ -140,7 +141,17 @@
             resize: none;
             outline: none;
             white-space: pre; 
+            width: 100%;
+            display: block;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .editor-pane {
+            flex: 1;
+            min-width: 50px;
+            min-height: 0;
             overflow: auto;
+            overflow-x: scroll;
         }
 
         /* 拖拽分割线 */
@@ -193,13 +204,19 @@
         ::-webkit-scrollbar-corner {
             background-color: var(--bg-color); 
         }
+        .status { font-size: 12px; color: #aaa; margin: 10px 0 0; min-height: 18px; }
+        .status.mismatch { color: #f5bd73; }
+        .header { gap: 12px; flex-wrap: wrap; }
+        .toggle-btn:focus-visible, .resizer:focus-visible { outline: 2px solid #409cff; outline-offset: 2px; }
+        .resizer { touch-action: none; }
+        @media (max-width: 600px) { body { padding: 10px; } h1 { font-size: 1rem; } .line-numbers { width: 42px; min-width: 42px; padding-right: 8px; } .sync-pane { font-size: 12px; } }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>字幕双语对齐工具</h1>
-        <button id="toggle-btn" class="toggle-btn">切换至三列模式</button>
+        <button id="toggle-btn" class="toggle-btn" aria-pressed="false">切换至三列模式</button>
     </div>
 
     <div class="editor-container">
@@ -210,212 +227,198 @@
         <div id="line-numbers" class="sync-pane line-numbers">1</div>
         
         <!-- 文本框 1 (左) -->
-        <textarea id="left-text" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴英文原文..."></textarea>
+        <div class="editor-pane"><textarea id="left-text" aria-label="英文原文" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴英文原文..."></textarea></div>
         
         <!-- 分割线 1 -->
-        <div class="resizer" id="resizer-1"></div>
+        <div class="resizer" id="resizer-1" role="separator" aria-label="调整相邻列宽" aria-orientation="vertical" tabindex="0"></div>
 
         <!-- 文本框 2 (中 - 默认隐藏) -->
-        <textarea id="middle-text" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴机翻 / 辅助参考..." style="display: none;"></textarea>
+        <div class="editor-pane" style="display: none;"><textarea id="middle-text" aria-label="辅助参考" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴机翻 / 辅助参考..."></textarea></div>
         
         <!-- 分割线 2 (默认隐藏) -->
-        <div class="resizer" id="resizer-2" style="display: none;"></div>
+        <div class="resizer" id="resizer-2" role="separator" aria-label="调整相邻列宽" aria-orientation="vertical" tabindex="0" style="display: none;"></div>
 
         <!-- 文本框 3 (右) -->
-        <textarea id="right-text" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴人工修改 / 最终译文..."></textarea>
+        <div class="editor-pane"><textarea id="right-text" aria-label="最终译文" class="sync-pane text-editor" wrap="off" spellcheck="false" placeholder="在此粘贴人工修改 / 最终译文..."></textarea></div>
     </div>
+
+    <p id="status" class="status" role="status"></p>
 
     <script>
         const leftText = document.getElementById('left-text');
         const middleText = document.getElementById('middle-text');
         const rightText = document.getElementById('right-text');
+        const editors = [leftText, middleText, rightText];
         const lineNumbers = document.getElementById('line-numbers');
         const highlightBar = document.getElementById('highlight-bar');
         const toggleBtn = document.getElementById('toggle-btn');
-        const resizer1 = document.getElementById('resizer-1');
-        const resizer2 = document.getElementById('resizer-2');
+        const status = document.getElementById('status');
+        const LINE_HEIGHT = 28, PADDING_TOP = 14;
+        const DRAFT_KEY = 'subtitle-alignment-draft-v1';
+        const expectedScroll = new WeakMap();
+        let isThreeCol = false, activeEditor = null, currentLineIndex = -1, saveTimer = 0;
+        let saved = true, lastLineCount = 0;
+        const visibleEditors = () => editors.filter(editor => editor.parentElement.style.display !== 'none');
+        const lineCount = editor => editor.value.split('\n').length;
 
-        const LINE_HEIGHT = 28;
-        const PADDING_TOP = 14;
-
-        // ==== 1. 切换两列/三列模式逻辑 ====
-        let isThreeCol = false;
-        
-        toggleBtn.addEventListener('click', () => {
-            isThreeCol = !isThreeCol;
-            
-            // 切换时，将各列重置为均等宽度
-            leftText.style.flex = '1';
-            middleText.style.flex = '1';
-            rightText.style.flex = '1';
-
-            if (isThreeCol) {
-                middleText.style.display = 'block';
-                resizer2.style.display = 'block';
-                toggleBtn.textContent = '切换至两列模式';
-            } else {
-                middleText.style.display = 'none';
-                resizer2.style.display = 'none';
-                toggleBtn.textContent = '切换至三列模式';
+        function syncScroll(source) {
+            const top = source.scrollTop;
+            for (const other of [...visibleEditors().map(editor => editor.parentElement), lineNumbers]) {
+                if (other === source || Math.abs(other.scrollTop - top) < 1) continue;
+                other.scrollTop = top;
+                expectedScroll.set(other, other.scrollTop);
             }
-            updateLineNumbers(); 
-            renderHighlight();   
-        });
-
-        // ==== 2. 宽度拖拽调整逻辑 ====
-        function setupResizer(resizerId) {
-            const resizer = document.getElementById(resizerId);
-            let prevSibling, nextSibling;
-            let x = 0;
-            let prevWidth = 0;
-            let nextWidth = 0;
-
-            const mouseDownHandler = function(e) {
-                x = e.clientX;
-                
-                // 向上寻找上一个可见的文本框
-                prevSibling = resizer.previousElementSibling;
-                while (prevSibling && (window.getComputedStyle(prevSibling).display === 'none' || prevSibling.classList.contains('resizer') || prevSibling.id === 'highlight-bar')) {
-                    prevSibling = prevSibling.previousElementSibling;
-                }
-                
-                // 向下寻找下一个可见的文本框
-                nextSibling = resizer.nextElementSibling;
-                while (nextSibling && (window.getComputedStyle(nextSibling).display === 'none' || nextSibling.classList.contains('resizer'))) {
-                    nextSibling = nextSibling.nextElementSibling;
-                }
-
-                if (!prevSibling || !nextSibling) return;
-
-                // 【核心修复区域：避免浏览器重排跳变】
-                // 第一步：先将所有可见的框和宽度的读取操作集中在一起
-                prevWidth = prevSibling.getBoundingClientRect().width;
-                nextWidth = nextSibling.getBoundingClientRect().width;
-                
-                const visibleEditors = Array.from(document.querySelectorAll('.text-editor'))
-                                            .filter(el => window.getComputedStyle(el).display !== 'none');
-                const currentWidths = visibleEditors.map(el => el.getBoundingClientRect().width);
-
-                // 第二步：集中执行写入操作（此时所有真实宽度已经读取完毕，写入不再引发相互影响的重排计算）
-                visibleEditors.forEach((el, index) => {
-                    el.style.flex = `${currentWidths[index]} 1 0%`;
-                });
-
-                // 绑定拖拽事件
-                document.addEventListener('mousemove', mouseMoveHandler);
-                document.addEventListener('mouseup', mouseUpHandler);
-                resizer.classList.add('dragging');
-                document.body.style.cursor = 'col-resize';
-                
-                // 拖拽时临时禁用文本框交互，防止意外选中文本产生卡顿
-                document.querySelectorAll('.text-editor').forEach(el => el.style.pointerEvents = 'none');
-            };
-
-            const mouseMoveHandler = function(e) {
-                const dx = e.clientX - x;
-                
-                if (prevWidth + dx < 50 || nextWidth - dx < 50) return;
-
-                // 实时分配新的宽度比例
-                prevSibling.style.flex = `${prevWidth + dx} 1 0%`;
-                nextSibling.style.flex = `${nextWidth - dx} 1 0%`;
-            };
-
-            const mouseUpHandler = function() {
-                resizer.classList.remove('dragging');
-                document.body.style.cursor = '';
-                document.removeEventListener('mousemove', mouseMoveHandler);
-                document.removeEventListener('mouseup', mouseUpHandler);
-                
-                document.querySelectorAll('.text-editor').forEach(el => el.style.pointerEvents = '');
-            };
-
-            resizer.addEventListener('mousedown', mouseDownHandler);
-        }
-
-        setupResizer('resizer-1');
-        setupResizer('resizer-2');
-
-
-        // ==== 3. 高亮行追踪逻辑 ====
-        let currentLineIndex = -1;
-
-        function updateActiveLine(textarea) {
-            const textUntilCursor = textarea.value.substring(0, textarea.selectionStart);
-            currentLineIndex = textUntilCursor.split('\n').length - 1;
             renderHighlight();
         }
-
-        function renderHighlight() {
-            if (currentLineIndex === -1) {
-                highlightBar.style.display = 'none';
-                return;
-            }
-            highlightBar.style.display = 'block';
-            
-            const scrollPos = lineNumbers.scrollTop;
-            const yPos = PADDING_TOP + (currentLineIndex * LINE_HEIGHT) - scrollPos;
-            highlightBar.style.transform = `translateY(${yPos}px)`;
-        }
-
-        ['mouseup', 'keyup', 'focus', 'input'].forEach(evt => {
-            leftText.addEventListener(evt, () => updateActiveLine(leftText));
-            middleText.addEventListener(evt, () => updateActiveLine(middleText));
-            rightText.addEventListener(evt, () => updateActiveLine(rightText));
-        });
-
-        // ==== 4. 智能多列同步滚动 ====
-        function bindSyncScroll(element) {
-            element.addEventListener('scroll', function() {
-                if (element.ignoreScroll) {
-                    element.ignoreScroll = false;
-                    return;
-                }
-                const top = element.scrollTop;
-                const others =[leftText, middleText, rightText, lineNumbers].filter(el => el !== element);
-                others.forEach(other => {
-                    if (other.style.display !== 'none') {
-                        other.ignoreScroll = true; 
-                        other.scrollTop = top;
-                    }
-                });
-                renderHighlight(); 
+        for (const element of [...editors.map(editor => editor.parentElement), lineNumbers]) {
+            element.addEventListener('scroll', () => {
+                const expected = expectedScroll.get(element);
+                expectedScroll.delete(element);
+                // If the browser emits no event for an unchanged scroll position, a stale
+                // expectation cannot swallow the next real user scroll.
+                if (expected !== undefined && Math.abs(expected - element.scrollTop) < 1) return;
+                syncScroll(element);
             });
         }
 
-        bindSyncScroll(leftText);
-        bindSyncScroll(middleText);
-        bindSyncScroll(rightText);
-        bindSyncScroll(lineNumbers);
-
-        // ==== 5. 动态生成行号逻辑 ====
-        let lastLineCount = 1;
-
-        function updateLineNumbers() {
-            const leftLines = leftText.value.split('\n').length;
-            const rightLines = rightText.value.split('\n').length;
-            let maxLines = Math.max(leftLines, rightLines, 1);
-            
-            if (isThreeCol) {
-                const middleLines = middleText.value.split('\n').length;
-                maxLines = Math.max(maxLines, middleLines);
+        function renderHighlight() {
+            if (!activeEditor || !visibleEditors().includes(activeEditor) || currentLineIndex < 0) {
+                highlightBar.style.display = 'none';
+                return;
             }
-
-            if (maxLines !== lastLineCount) {
-                let numbersStr = '';
-                for (let i = 1; i <= maxLines; i++) {
-                    numbersStr += i + '\n';
-                }
-                lineNumbers.textContent = numbersStr;
-                lastLineCount = maxLines;
+            const y = PADDING_TOP + currentLineIndex * LINE_HEIGHT - activeEditor.parentElement.scrollTop;
+            highlightBar.style.display = y + LINE_HEIGHT >= 0 && y < activeEditor.parentElement.clientHeight ? 'block' : 'none';
+            highlightBar.style.transform = `translateY(${y}px)`;
+        }
+        function updateActiveLine(editor) {
+            activeEditor = editor;
+            currentLineIndex = editor.value.slice(0, editor.selectionStart).split('\n').length - 1;
+            const pane = editor.parentElement;
+            const top = PADDING_TOP + currentLineIndex * LINE_HEIGHT;
+            if (top < pane.scrollTop) pane.scrollTop = Math.max(0, top - PADDING_TOP);
+            else if (top + LINE_HEIGHT > pane.scrollTop + pane.clientHeight) pane.scrollTop = top + LINE_HEIGHT - pane.clientHeight;
+            syncScroll(pane);
+            renderHighlight();
+        }
+        for (const editor of editors) {
+            for (const event of ['mouseup', 'keyup', 'focus', 'input', 'select']) {
+                editor.addEventListener(event, () => updateActiveLine(editor));
             }
+            editor.addEventListener('input', () => { saved = false; updateLines(); scheduleSave(); });
+        }
+        document.addEventListener('selectionchange', () => {
+            if (editors.includes(document.activeElement)) updateActiveLine(document.activeElement);
+        });
+
+        function updateLines() {
+            const visible = visibleEditors(), counts = visible.map(lineCount);
+            const max = Math.max(1, ...counts);
+            if (lastLineCount !== max) { lineNumbers.textContent = Array.from({ length: max }, (_, i) => i + 1).join('\n'); lastLineCount = max; }
+            // Every pane scrolls a canvas with the same height; the subtitle value is never padded.
+            visible.forEach(editor => {
+                editor.style.height = `${max * LINE_HEIGHT + PADDING_TOP * 2}px`;
+                editor.style.width = '100%';
+                const contentWidth = editor.scrollWidth;
+                if (contentWidth > editor.clientWidth) editor.style.width = `${contentWidth}px`;
+            });
+            const pane = leftText.parentElement;
+            const scrollbarHeight = Math.max(0, pane.offsetHeight - pane.clientHeight);
+            lineNumbers.style.paddingBottom = `${PADDING_TOP + scrollbarHeight}px`;
+            status.classList.toggle('mismatch', new Set(counts).size > 1);
+            status.textContent = `原文 ${lineCount(leftText)} 行 · ${isThreeCol ? `参考 ${lineCount(middleText)} 行 · ` : ''}译文 ${lineCount(rightText)} 行${new Set(counts).size > 1 ? ' · 行数不同，请检查对应关系' : ''} · ${saved ? '草稿已保存到本机' : '草稿尚未保存，请保留副本'}`;
+            syncScroll(activeEditor && visible.includes(activeEditor) ? activeEditor.parentElement : leftText.parentElement);
         }
 
-        leftText.addEventListener('input', updateLineNumbers);
-        middleText.addEventListener('input', updateLineNumbers);
-        rightText.addEventListener('input', updateLineNumbers);
+        function setMode(threeColumns) {
+            const top = activeEditor?.parentElement.scrollTop ?? leftText.parentElement.scrollTop;
+            isThreeCol = threeColumns;
+            editors.forEach(editor => { editor.parentElement.style.flex = '1'; });
+            middleText.parentElement.style.display = threeColumns ? 'block' : 'none';
+            document.getElementById('resizer-2').style.display = threeColumns ? 'block' : 'none';
+            toggleBtn.textContent = threeColumns ? '切换至两列模式' : '切换至三列模式';
+            toggleBtn.setAttribute('aria-pressed', String(threeColumns));
+            if (!threeColumns && activeEditor === middleText) activeEditor = leftText;
+            updateLines();
+            leftText.parentElement.scrollTop = top;
+            syncScroll(leftText.parentElement);
+            renderHighlight();
+        }
+        toggleBtn.addEventListener('click', () => { setMode(!isThreeCol); scheduleSave(); });
 
-        updateLineNumbers();
+        function scheduleSave() {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(saveDraft, 300);
+        }
+        function saveDraft() {
+            try {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify({ left: leftText.value, middle: middleText.value, right: rightText.value, threeColumns: isThreeCol }));
+                saved = true;
+            } catch { saved = false; }
+            updateLines();
+        }
+        window.addEventListener('pagehide', saveDraft);
+        try {
+            const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+            if (draft && typeof draft === 'object') {
+                leftText.value = typeof draft.left === 'string' ? draft.left : '';
+                middleText.value = typeof draft.middle === 'string' ? draft.middle : '';
+                rightText.value = typeof draft.right === 'string' ? draft.right : '';
+                isThreeCol = draft.threeColumns === true;
+            }
+        } catch { saved = false; }
+
+        function setupResizer(resizer) {
+            let pair = null, startX = 0, startWidths = [];
+            const neighbors = () => {
+                const visible = visibleEditors().map(editor => editor.parentElement);
+                const before = visible.filter(editor => editor.compareDocumentPosition(resizer) & Node.DOCUMENT_POSITION_FOLLOWING).at(-1);
+                const after = visible.find(editor => resizer.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING);
+                return before && after ? [before, after] : null;
+            };
+            const setWidths = (panes, widths) => panes.forEach((editor, i) => {
+                const style = getComputedStyle(editor);
+                const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+                editor.style.flex = `${Math.max(1, widths[i] - padding)} 1 0%`;
+            });
+            resizer.addEventListener('pointerdown', event => {
+                if (event.button !== 0) return;
+                pair = neighbors();
+                if (!pair) return;
+                event.preventDefault();
+                const visible = visibleEditors().map(editor => editor.parentElement);
+                const widths = visible.map(editor => editor.getBoundingClientRect().width);
+                startWidths = pair.map(editor => editor.getBoundingClientRect().width);
+                startX = event.clientX;
+                setWidths(visible, widths);
+                resizer.setPointerCapture(event.pointerId);
+                resizer.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+            });
+            resizer.addEventListener('pointermove', event => {
+                if (!pair) return;
+                const dx = Math.max(50 - startWidths[0], Math.min(startWidths[1] - 50, event.clientX - startX));
+                setWidths(pair, [startWidths[0] + dx, startWidths[1] - dx]);
+            });
+            const stop = () => { pair = null; resizer.classList.remove('dragging'); document.body.style.cursor = ''; };
+            resizer.addEventListener('pointerup', stop);
+            resizer.addEventListener('pointercancel', stop);
+            resizer.addEventListener('lostpointercapture', stop);
+            resizer.addEventListener('keydown', event => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                const panes = neighbors();
+                if (!panes) return;
+                event.preventDefault();
+                const visible = visibleEditors().map(editor => editor.parentElement);
+                setWidths(visible, visible.map(editor => editor.getBoundingClientRect().width));
+                const widths = panes.map(editor => editor.getBoundingClientRect().width);
+                const dx = event.key === 'ArrowLeft' ? -10 : 10;
+                if (widths[0] + dx >= 50 && widths[1] - dx >= 50) setWidths(panes, [widths[0] + dx, widths[1] - dx]);
+            });
+        }
+        setupResizer(document.getElementById('resizer-1'));
+        setupResizer(document.getElementById('resizer-2'));
+        window.addEventListener('resize', updateLines);
+        setMode(isThreeCol);
     </script>
 </body>
 </html>

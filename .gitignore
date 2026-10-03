@@ -1,2 +1,8 @@
 *.DS_Store
 node_modules
+
+# Local maintenance records and screenshots; keep them out of the public site.
+LOCAL_SUBTITLE_REVIEW_2026-10-04.md
+LOCAL_WEB_MAINTENANCE_2026-10-04.md
+maintenance-reports/
+maintenance/

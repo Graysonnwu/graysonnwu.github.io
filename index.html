@@ -84,6 +84,16 @@
       opacity: 1;
     }
 
+    .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+    .card::after { pointer-events: none; }
+    .search { max-width: 520px; margin: 20px auto 0; text-align: left; }
+    .search label { display: block; margin-bottom: 8px; color: var(--sub); font-size: .9em; }
+    .search input { width: 100%; font: inherit; padding: 12px 14px; color: var(--text); background: var(--card); border: 1px solid #3d4655; border-radius: 9px; }
+    .search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    #search-status { min-height: 1.3em; margin: 8px 0 0; font-size: .85em; color: var(--sub); }
+    [hidden] { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { .card, .card::after { transition: none; } .card:hover { transform: none; } }
+
     .card h3 {
       margin: 0 0 10px;
     }
@@ -107,9 +117,14 @@
 
 <header>
   <h1>贰鼠自用小工具</h1>
+  <div class="search">
+    <label for="tool-search">查找工具</label>
+    <input type="search" id="tool-search" placeholder="输入名称或用途，例如：字幕、焦距、封面" autocomplete="off">
+    <p id="search-status" role="status" aria-live="polite"></p>
+  </div>
 </header>
 
-<div class="container">
+<main class="container">
 
   <!-- ================= 字幕工具 ================= -->
   <div class="section">
@@ -126,7 +141,7 @@
 
       <a class="card" href="ass_align/">
         <h3>字幕双语对齐</h3>
-        <p>ASS 字幕时间轴自动对齐工具</p>
+        <p>双语字幕逐行对照与同步滚动</p>
       </a>
 
       <a class="card" href="ass_editor/">
@@ -136,7 +151,7 @@
 
       <a class="card" href="ass_tools/">
         <h3>字幕综合工具</h3>
-        <p>坐标拾取、取色与净化</p>
+        <p>ASS 坐标拾取、取色与颜色校准</p>
       </a>
     </div>
   </div>
@@ -220,11 +235,35 @@
   </div>
   -->
 
-</div>
+</main>
 
 <footer>
   © 2026 贰鼠 · GitHub Pages
 </footer>
 
+<script>
+  const searchInput = document.getElementById('tool-search');
+  const sections = [...document.querySelectorAll('.section')];
+  const cards = [...document.querySelectorAll('a.card')];
+  const status = document.getElementById('search-status');
+  function filterTools() {
+    const query = searchInput.value.trim().toLocaleLowerCase();
+    const words = query.split(/\s+/).filter(Boolean);
+    let visible = 0;
+    for (const card of cards) {
+      const category = card.closest('.section').querySelector('h2').textContent;
+      const text = (category + ' ' + card.textContent).toLocaleLowerCase();
+      card.hidden = !words.every(word => text.includes(word));
+      if (!card.hidden) visible++;
+    }
+    for (const section of sections) section.hidden = ![...section.querySelectorAll('a.card')].some(card => !card.hidden);
+    status.textContent = query ? (visible ? `找到 ${visible} 个工具` : '没有匹配的工具，请换个关键词。') : `共 ${cards.length} 个工具`;
+  }
+  searchInput.addEventListener('input', filterTools);
+  searchInput.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { searchInput.value = ''; filterTools(); }
+  });
+  filterTools();
+</script>
 </body>
 </html>
